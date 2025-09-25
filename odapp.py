@@ -266,17 +266,21 @@ def order_details_page():
                 st.session_state['show_dialog'] = True
                 st.rerun()
             if st.session_state['show_dialog']:
-                st.write("This will turn the order status to Delivered. Are you sure?")
-                if st.button("Yes"):
-                    if update_order_status(st.session_state['selected_order'], "Delivered"):
-                        st.session_state['show_dialog'] = False
-                        st.session_state['show_success'] = True
-                        st.rerun()
-                    else:
-                        st.error("Failed to update order status.")
-                if st.button("No"):
-                    st.session_state['show_dialog'] = False
-                    st.rerun()
+                with st.expander("Confirm Order Completion", expanded=True):
+                    st.write("This will turn the order status to Delivered. Are you sure?")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Yes"):
+                            if update_order_status(st.session_state['selected_order'], "Delivered"):
+                                st.session_state['show_dialog'] = False
+                                st.session_state['show_success'] = True
+                                st.rerun()
+                            else:
+                                st.error("Failed to update order status.")
+                    with col2:
+                        if st.button("No"):
+                            st.session_state['show_dialog'] = False
+                            st.rerun()
 
         if 'show_success' in st.session_state and st.session_state['show_success']:
             st.success("Order completed successfully!", icon="✅")
