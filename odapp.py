@@ -206,17 +206,9 @@ def order_details_page():
     df = pd.DataFrame(data)
     order_row = df[df['Order'] == st.session_state['selected_order']].iloc[0]
 
-    # Display order details with copy buttons (Shoe info first)
+    # Display order details with copy buttons (Shoe info combined)
     st.write(f"**Order Number:** {order_row['Order']}")
-    st.write(f"**Item:**")
-    st.text_area("", value=order_row['Item'], height=50, disabled=True, key="item_box")
-    st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{order_row['Item']}')\">Copy</button>", unsafe_allow_html=True)
-    st.write(f"**Color:**")
-    st.text_area("", value=order_row['Color'], height=50, disabled=True, key="color_box")
-    st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{order_row['Color']}')\">Copy</button>", unsafe_allow_html=True)
-    st.write(f"**Size:**")
-    st.text_area("", value=order_row['Size'], height=50, disabled=True, key="size_box")
-    st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{order_row['Size']}')\">Copy</button>", unsafe_allow_html=True)
+    st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})")
     st.write(f"**Name:**")
     st.text_area("", value=order_row['Name'], height=50, disabled=True, key="name_box")
     st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{order_row['Name']}')\">Copy</button>", unsafe_allow_html=True)
@@ -262,7 +254,7 @@ def order_details_page():
                 st.write("This will turn the order status to Delivered. Are you sure?")
                 if st.button("Yes"):
                     if update_order_status(st.session_state['selected_order'], "Delivered"):
-                        st.session_state['page'] = 'Order Completed'
+                        st.session_state['page'] = 'Pending Orders'
                         st.rerun()
                     else:
                         st.error("Failed to update order status.")
