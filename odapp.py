@@ -238,27 +238,44 @@ def order_details_page():
     # Success banner and message
     if 'success' in st.session_state:
         st.success("SF Delivery Number updated successfully!", icon="✅")
-        # Determine language based on item
-        has_chinese = bool(re.search(r'[\u4e00-\u9fff]', str(order_row['Item'])))
-        if has_chinese:
+        # Determine language based on entire row
+        row_text = ' '.join(str(order_row[col]) for col in order_row.index)
+        has_chinese = bool(re.search(r'[\u4e00-\u9fff]', row_text))
+        if 'message_lang' not in st.session_state:
+            st.session_state['message_lang'] = 'default'  # Initialize language state
+
+        if has_chinese and st.session_state['message_lang'] in ['default', 'zh']:
             message = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持🫡"
             st.text_area("", value=message, height=100, disabled=True, key="message_chinese")
             st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{message}')\">Copy</button>", unsafe_allow_html=True)
+            if st.button("English"):
+                st.session_state['message_lang'] = 'en'
+                st.rerun()
         else:
             message = f"SF Delivery Number: {st.session_state['sf_delivery']}\nHello shoes are sent. Please leave a 5 star review when receiving the product. Have a nice day."
             st.text_area("", value=message, height=100, disabled=True, key="message_english")
             st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{message}')\">Copy</button>", unsafe_allow_html=True)
+            if st.button("中文"):
+                st.session_state['message_lang'] = 'zh'
+                st.rerun()
 
         if st.button("Finish"):
-            with st.dialog("Confirm Order Completion"):
+            if 'show_dialog' not in st.session_state:
+                st.session_state['show_dialog'] = False
+            if not st.session_state['show_dialog']:
+                st.session_state['show_dialog'] = True
+                st.rerun()
+            if st.session_state['show_dialog']:
                 st.write("This will turn the order status to Delivered. Are you sure?")
                 if st.button("Yes"):
                     if update_order_status(st.session_state['selected_order'], "Delivered"):
                         st.session_state['page'] = 'Pending Orders'
+                        st.session_state['show_dialog'] = False
                         st.rerun()
                     else:
                         st.error("Failed to update order status.")
                 if st.button("No"):
+                    st.session_state['show_dialog'] = False
                     st.rerun()
 
 # Order Completed page
