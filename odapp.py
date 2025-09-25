@@ -273,7 +273,7 @@ def order_details_page():
                         st.session_state['show_success'] = True
                         st.rerun()
                     else:
-                        st.error("Failed to update order success.")
+                        st.error("Failed to update order status.")
                 if st.button("No"):
                     st.session_state['show_dialog'] = False
                     st.rerun()
@@ -282,7 +282,7 @@ def order_details_page():
             st.success("Order completed successfully!", icon="✅")
             if st.button("OK"):
                 st.session_state['page'] = 'Pending Orders'
-                del st.session_state['show_success']
+                st.session_state['show_success'] = False
                 st.rerun()
 
 # Order Completed page
