@@ -125,7 +125,7 @@ def update_order_status(order_num, status):
     if not df.empty and 'Order' in df.columns:
         row_idx = df.index[df['Order'] == order_num].tolist()
         if row_idx:
-            sheet.update_cell(row_idx[0] + 2, df.columns.get_loc('Status') + 1, status)
+            sheet.update_cell(row_idx[0] + 2, df.columns.get_loc('Status') + 1, status)  # Updates dropdown if status is a valid option
             return True
     return False
 
