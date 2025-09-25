@@ -282,7 +282,7 @@ def order_details_page():
             st.success("Order completed successfully!", icon="✅")
             if st.button("OK"):
                 st.session_state['page'] = 'Pending Orders'
-                st.session_state['show_success'] = False
+                del st.session_state['show_success']
                 st.rerun()
 
 # Order Completed page
