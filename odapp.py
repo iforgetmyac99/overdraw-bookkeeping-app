@@ -206,8 +206,17 @@ def order_details_page():
     df = pd.DataFrame(data)
     order_row = df[df['Order'] == st.session_state['selected_order']].iloc[0]
 
-    # Display order details with copy buttons
-    st.write(f"**Order Number:** {order_row['Order']} (Color: {order_row['Color']}, Size: {order_row['Size']})")
+    # Display order details with copy buttons (Shoe info first)
+    st.write(f"**Order Number:** {order_row['Order']}")
+    st.write(f"**Item:**")
+    st.text_area("", value=order_row['Item'], height=50, disabled=True, key="item_box")
+    st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{order_row['Item']}')\">Copy</button>", unsafe_allow_html=True)
+    st.write(f"**Color:**")
+    st.text_area("", value=order_row['Color'], height=50, disabled=True, key="color_box")
+    st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{order_row['Color']}')\">Copy</button>", unsafe_allow_html=True)
+    st.write(f"**Size:**")
+    st.text_area("", value=order_row['Size'], height=50, disabled=True, key="size_box")
+    st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{order_row['Size']}')\">Copy</button>", unsafe_allow_html=True)
     st.write(f"**Name:**")
     st.text_area("", value=order_row['Name'], height=50, disabled=True, key="name_box")
     st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{order_row['Name']}')\">Copy</button>", unsafe_allow_html=True)
@@ -240,23 +249,25 @@ def order_details_page():
         # Determine language based on item
         has_chinese = bool(re.search(r'[\u4e00-\u9fff]', str(order_row['Item'])))
         if has_chinese:
-            st.write("順豐number:")
-            st.text_area("", value=st.session_state['sf_delivery'], height=50, disabled=True, key="sf_chinese")
-            st.write("Hello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持🫡")
+            message = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持🫡"
+            st.text_area("", value=message, height=100, disabled=True, key="message_chinese")
+            st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{message}')\">Copy</button>", unsafe_allow_html=True)
         else:
-            st.write("SF Delivery Number:")
-            st.text_area("", value=st.session_state['sf_delivery'], height=50, disabled=True, key="sf_english")
-            st.write("Hello shoes are sent. Please leave a 5 star review when receiving the product. Have a nice day.")
+            message = f"SF Delivery Number: {st.session_state['sf_delivery']}\nHello shoes are sent. Please leave a 5 star review when receiving the product. Have a nice day."
+            st.text_area("", value=message, height=100, disabled=True, key="message_english")
+            st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{message}')\">Copy</button>", unsafe_allow_html=True)
 
         if st.button("Finish"):
-            if st.button("Yes", key="yes_confirm"):
-                if update_order_status(st.session_state['selected_order'], "Delivered"):
-                    st.session_state['page'] = 'Order Completed'
+            with st.dialog("Confirm Order Completion"):
+                st.write("This will turn the order status to Delivered. Are you sure?")
+                if st.button("Yes"):
+                    if update_order_status(st.session_state['selected_order'], "Delivered"):
+                        st.session_state['page'] = 'Order Completed'
+                        st.rerun()
+                    else:
+                        st.error("Failed to update order status.")
+                if st.button("No"):
                     st.rerun()
-                else:
-                    st.error("Failed to update order status.")
-            if st.button("No", key="no_confirm"):
-                st.rerun()
 
 # Order Completed page
 def order_completed_page():
