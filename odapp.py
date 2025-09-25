@@ -1,33 +1,18 @@
 import streamlit as st
 import gspread
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google.oauth2.service_account import Credentials  # Updated import
 import pandas as pd
 from io import BytesIO
 import os
 import re  # For extracting data from template
 from datetime import datetime
 from builtins import max
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials  # Added import for Credentials
-import os
 
 # Google Sheets config with environment variable support
 @st.cache_resource
 def load_gspread():
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-    creds = None
-    # Check if token_out.json exists to reuse credentials
-    if os.path.exists('token_out.json'):
-        creds = Credentials.from_authorized_user_file('token_out.json', scope)
-    # Use credentials.json if token is invalid or missing
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            creds = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', scope).run_local_server(port=0)
-            with open('token_out.json', 'w') as token:
-                token.write(creds.to_json())
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
     return gspread.authorize(creds).open_by_key('10CLEJyH7LGkZrVjc8EiicJ2PCBY_se7gALChd_YyaCg').sheet1
 
 # Commented out login section (will uncomment later as requested)
