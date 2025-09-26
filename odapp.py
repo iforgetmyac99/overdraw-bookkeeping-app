@@ -200,13 +200,17 @@ def home_page():
         st.rerun()
 
 # Pending Orders page
-@st.cache_data
+@st.cache_data(show_spinner=False)
 def get_pending_df(_refresh_trigger):
     sheet = load_gspread()
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
-    pending_df = df[df['Status'] == 'Pending'][['Order', 'Item', 'Color', 'Size']].dropna()
-    return pending_df
+    if not df.empty and 'Status' in df.columns:
+        # Normalize Status column to handle whitespace and case sensitivity
+        df['Status'] = df['Status'].astype(str).str.strip().str.lower()
+        pending_df = df[df['Status'] == 'pending'][['Order', 'Item', 'Color', 'Size']].dropna()
+        return pending_df
+    return pd.DataFrame()
 
 def pending_orders_page():
     col1, col2 = st.columns([8, 1])
@@ -219,6 +223,7 @@ def pending_orders_page():
         st.session_state['refresh_trigger'] = time.time()
     
     if st.button("Refresh", key="refresh_button_pending"):
+        get_pending_df.clear()  # Clear cache to force fresh data
         st.session_state['refresh_trigger'] = time.time()
     
     pending_df = get_pending_df(st.session_state['refresh_trigger'])
@@ -239,7 +244,10 @@ def pending_orders_page():
     </script>
     """, unsafe_allow_html=True)
 
+    # Debugging output to verify data
     if not pending_df.empty:
+        st.write(f"Found {len(pending_df)} pending orders:")
+        st.dataframe(pending_df, use_container_width=True)  # Display raw data for debugging
         for index, row in pending_df.iterrows():
             if st.button(f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})", key=f"order_{row['Order']}"):
                 st.session_state['selected_order'] = row['Order']
@@ -248,7 +256,7 @@ def pending_orders_page():
                 reset_page_state('Order Details')
                 st.rerun()
     else:
-        st.write("No pending orders found.")
+        st.warning("No pending orders found. Check if 'Status' column in Google Sheet has 'Pending' entries.")
 
     # Handle navigation
     if st.session_state.get('page') != 'Pending Orders':
@@ -282,7 +290,7 @@ def order_details_page():
     </script>
     """, unsafe_allow_html=True)
 
-    if 'selected_order' not in st.session_state:
+    if Ensuite 'selected_order' not in st.session_state:
         st.error("No order selected. Please go back to Pending Orders.")
         return
 
@@ -297,7 +305,7 @@ def order_details_page():
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="item-container"><p class="item-label">Item, Color, Size:</p>', unsafe_allow_html=True)
-    st.text_area("", value=f"{order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})", height=50, disabled=True, key=f"item_box_{st.session_state['selected_order']}")
+    st.text_area("", value=f"{order_row['Item']} (Color: {order_row['Color']}, Size: {row['Size']})", height=50, disabled=True, key=f"item_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="item-container"><p class="item-label">Name:</p>', unsafe_allow_html=True)
@@ -308,7 +316,7 @@ def order_details_page():
     st.text_area("", value=str(order_row['Phone']) if not pd.isna(order_row['Phone']) else "", height=50, disabled=True, key=f"phone_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="item-container"><p class="item-label">Address:</p>', unsafe_allow_html=True)
+ loro  st.markdown('<div class="item-container"><p class="item-label">Address:</p>', unsafe_allow_html=True)
     st.text_area("", value=str(order_row['Address']) if not pd.isna(order_row['Address']) else "", height=100, disabled=True, key=f"address_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
 
