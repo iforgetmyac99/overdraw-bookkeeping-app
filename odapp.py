@@ -4,10 +4,13 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 from io import BytesIO
 import os
-import re  # For extracting data from template
+import re
 from datetime import datetime
 from builtins import max
-from st_clipboard import copy_to_clipboard  # New import for reliable clipboard copying
+from st_clipboard import copy_to_clipboard  # For reliable clipboard copying
+import streamlit_authenticator as stauth
+import requests
+from urllib.parse import urlencode
 
 # Google Sheets config with environment variable support
 @st.cache_resource
@@ -16,29 +19,94 @@ def load_gspread():
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
     return gspread.authorize(creds).open_by_key('10CLEJyH7LGkZrVjc8EiicJ2PCBY_se7gALChd_YyaCg').sheet1
 
-# Commented out login section (will uncomment later as requested)
-# def check_login():
-#     if 'logged_in' not in st.session_state:
-#         st.session_state.logged_in = False
-#     if not st.session_state.logged_in:
-#         st.header("Login")
-#         username = st.text_input("Username")
-#         password = st.text_input("Password", type="password")
-#         if st.button("Log In"):
-#             if username == "iforgetmyac99" and password == "OverDraw@99":
-#                 st.session_state.logged_in = True
-#                 st.rerun()
-#             else:
-#                 st.error("Incorrect credentials")
-#         st.stop()
+# State reset function for Task 6
+def reset_page_state(page):
+    """Reset session state variables for a fresh page load."""
+    state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang']
+    for key in state_keys:
+        if key in st.session_state:
+            del st.session_state[key]
+    if page == 'Book Keeping':
+        st.session_state['template_text'] = ""  # Clear template text input
+    elif page == 'Order Details':
+        st.session_state['sf_input'] = ""  # Clear SF delivery input
 
-# Extract data from Carousell template (supports English and Chinese, refined extraction)
+# Google OAuth2 Login
+def google_login():
+    st.title("OverDraw Management Portal")
+    st.markdown("""
+    <style>
+    .login-button { display: flex; justify-content: center; }
+    .login-button button { background-color: #4285F4; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; }
+    .login-button button:hover { background-color: #357ae8; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    if 'auth_state' not in st.session_state:
+        st.session_state['auth_state'] = 'not_authenticated'
+
+    # Google OAuth2 configuration
+    client_id = st.secrets["google_oauth"]["client_id"]
+    redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode({
+        'client_id': client_id,
+        'redirect_uri': redirect_uri,
+        'response_type': 'code',
+        'scope': 'email profile',
+        'access_type': 'offline',
+        'prompt': 'consent'
+    })}"
+
+    # Display Login button
+    if st.session_state['auth_state'] == 'not_authenticated':
+        st.markdown('<div class="login-button"><a href="{}"><button>Login with Google</button></a></div>'.format(auth_url), unsafe_allow_html=True)
+        st.stop()
+
+    # Handle OAuth callback
+    query_params = st.experimental_get_query_params()
+    if 'code' in query_params:
+        code = query_params['code'][0]
+        # Exchange code for access token
+        token_url = "https://oauth2.googleapis.com/token"
+        token_data = {
+            'code': code,
+            'client_id': client_id,
+            'client_secret': st.secrets["google_oauth"]["client_secret"],
+            'redirect_uri': redirect_uri,
+            'grant_type': 'authorization_code'
+        }
+        response = requests.post(token_url, data=token_data)
+        token_json = response.json()
+
+        if 'access_token' in token_json:
+            # Get user info
+            user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+            headers = {'Authorization': f"Bearer {token_json['access_token']}"}
+            user_info = requests.get(user_info_url, headers=headers).json()
+
+            # Check if the email is allowed
+            allowed_email = "ryantlyu1018@gmail.com"
+            if user_info.get('email') == allowed_email:
+                st.session_state['auth_state'] = 'authenticated'
+                st.session_state['user_email'] = user_info['email']
+                st.session_state['page'] = 'Home'
+                st.experimental_set_query_params()  # Clear query params
+                st.rerun()
+            else:
+                st.error("Access denied: Only ryantlyu1018@gmail.com is authorized.")
+                st.session_state['auth_state'] = 'not_authenticated'
+                st.stop()
+        else:
+            st.error("Authentication failed. Please try again.")
+            st.session_state['auth_state'] = 'not_authenticated'
+            st.stop()
+
+# Extract data from Carousell template
 def extract_data(template_text):
     sheet = load_gspread()
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
 
-    # Get the latest Order number and increment
     if not df.empty and 'Order' in df.columns:
         latest_order = df['Order'].dropna().astype(str)
         if latest_order.empty:
@@ -46,23 +114,21 @@ def extract_data(template_text):
         else:
             latest_num = max(latest_order)
             num_part = int(latest_num.replace('OD', '')) + 1
-            order_num = f"OD{num_part:03d}"  # Formats as OD001, OD002, etc.
+            order_num = f"OD{num_part:03d}"
     else:
-        order_num = "OD001"  # Start with OD001 if no data
+        order_num = "OD001"
 
-    # Date in dd/mm/yyyy format
     date = datetime.now().strftime("%d/%m/%Y")
     carousell_id = ""
     item = ""
     color = ""
     size = ""
-    status = "Pending"  # Default status for new orders
+    status = "Pending"
     name = ""
     phone = ""
     address = ""
     sf_delivery_number = ""
 
-    # Refined English regex patterns (stop at next field or newline)
     item_en = re.search(r'Shoe:\s*([^\n]+)', template_text)
     color_en = re.search(r'Color:\s*([^\n]+)', template_text)
     size_en = re.search(r'Size:\s*(\d+)', template_text)
@@ -70,7 +136,6 @@ def extract_data(template_text):
     phone_en = re.search(r'Phone:\s*(\d+)', template_text)
     address_en = re.search(r'Address:\s*(.+?)(?=\s*(Phone|Payment|\n|$))', template_text, re.DOTALL)
 
-    # Refined Chinese regex patterns (stop at next field or newline)
     item_zh = re.search(r'鞋款：\s*([^\n]+)', template_text)
     color_zh = re.search(r'顏色：\s*([^\n]+)', template_text)
     size_zh = re.search(r'碼數：\s*(\d+)', template_text)
@@ -78,7 +143,6 @@ def extract_data(template_text):
     phone_zh = re.search(r'電話：\s*(\d+)', template_text)
     address_zh = re.search(r'地址：\s*(.+?)(?=\s*(電話|付款方式|\n|$))', template_text, re.DOTALL)
 
-    # Assign values (prioritize English, fallback to Chinese if English not found)
     item = item_en.group(1).strip() if item_en else (item_zh.group(1).strip() if item_zh else "")
     color = color_en.group(1).strip() if color_en else (color_zh.group(1).strip() if color_zh else "")
     size = size_en.group(1) if size_en else (size_zh.group(1) if size_zh else "")
@@ -102,7 +166,6 @@ def search_sheet(query):
     sheet = load_gspread()
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
-    # Simple search (e.g., contains query in any column)
     results = df[df.apply(lambda row: query.lower() in ' '.join(row.astype(str)).lower(), axis=1)]
     return results
 
@@ -130,39 +193,35 @@ def update_order_status(order_num, status):
             return True
     return False
 
-# Quick Responses (add your own)
+# Quick Responses
 quick_responses = [
     "Thank you for your purchase!",
     "Your order has been shipped.",
     "Sorry, item out of stock."
 ]
 
-def copy_to_clipboard(text):
-    st.markdown(f"""
-    <button onclick="navigator.clipboard.writeText('{text}')">Copy</button>
-    """, unsafe_allow_html=True)
-
 # Home page
 def home_page():
     st.title("Home Page")
     if st.button("Book Keeping"):
         st.session_state['page'] = 'Book Keeping'
+        reset_page_state('Book Keeping')
         st.rerun()
     if st.button("Pending Orders"):
         st.session_state['page'] = 'Pending Orders'
+        reset_page_state('Pending Orders')
         st.rerun()
-    # Placeholder for future functions
-    st.write("More functions will be added here later.")
 
 # Pending Orders page
 def pending_orders_page():
+    reset_page_state('Pending Orders')  # Reset state on entry
     st.title("Pending Orders")
     def go_home():
         st.session_state['page'] = 'Home'
     def refresh():
+        st.cache_data.clear()  # Clear cache for fresh data
         st.rerun()
-    # Place Home and Refresh buttons vertically aligned
-    col1 = st.columns(1)[0]  # Single column for vertical alignment
+    col1 = st.columns(1)[0]
     with col1:
         st.button("Home", key="home_button_pending", on_click=go_home)
         st.button("Refresh", key="refresh_button_pending", on_click=refresh)
@@ -171,7 +230,6 @@ def pending_orders_page():
     .stTextInput, .stTextArea { width: 100% !important; }
     .stDataFrame { width: 100%; overflow-x: auto; }
     .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
-    .home-button button { background: none; border: none; font-size: 16px; color: #666666; cursor: pointer; padding: 0; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -185,19 +243,21 @@ def pending_orders_page():
             if st.button(f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})", key=f"order_{row['Order']}"):
                 st.session_state['selected_order'] = row['Order']
                 st.session_state['page'] = 'Order Details'
+                reset_page_state('Order Details')
                 st.rerun()
     else:
         st.write("No pending orders found.")
 
 # Order Details page
 def order_details_page():
+    reset_page_state('Order Details')  # Reset state on entry
     st.title("Order Details")
     def go_home():
         st.session_state['page'] = 'Home'
     def go_pending_orders():
         st.session_state['page'] = 'Pending Orders'
-    # Place Return and Home buttons vertically aligned
-    col1 = st.columns(1)[0]  # Single column for vertical alignment
+        reset_page_state('Pending Orders')
+    col1 = st.columns(1)[0]
     with col1:
         st.button("Return", key="return_button", on_click=go_pending_orders)
         st.button("Home", key="home_button_details", on_click=go_home)
@@ -206,7 +266,6 @@ def order_details_page():
     .stTextInput, .stTextArea { width: 100% !important; }
     .stDataFrame { width: 100%; overflow-x: auto; }
     .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
-    .home-button button { background: none; border: none; font-size: 16px; color: #666666; cursor: pointer; padding: 0; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -219,24 +278,24 @@ def order_details_page():
     df = pd.DataFrame(data)
     order_row = df[df['Order'] == st.session_state['selected_order']].iloc[0]
 
-    # Display order details with copy buttons (Shoe info combined)
+    # Display order details with copy buttons (Task 5: Unified "Copy" label)
     st.write(f"**Order Number:** {order_row['Order']}")
     st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})")
     st.write(f"**Name:**")
     st.text_area("", value=order_row['Name'], height=50, disabled=True, key="name_box")
-    if st.button("Copy Name"):
+    if st.button("Copy", key="copy_name"):
         copy_to_clipboard(order_row['Name'])
     st.write(f"**Phone:**")
     st.text_area("", value=order_row['Phone'], height=50, disabled=True, key="phone_box")
-    if st.button("Copy Phone"):
+    if st.button("Copy", key="copy_phone"):
         copy_to_clipboard(order_row['Phone'])
     st.write(f"**Address:**")
     st.text_area("", value=order_row['Address'], height=100, disabled=True, key="address_box")
-    if st.button("Copy Address"):
+    if st.button("Copy", key="copy_address"):
         copy_to_clipboard(order_row['Address'])
 
     # SF Delivery Number input
-    sf_input = st.text_input("Enter SF Delivery Number", key="sf_input")
+    sf_input = st.text_input("Enter SF Delivery Number", key="sf_input", value="")
     if 'show_submit' not in st.session_state:
         st.session_state['show_submit'] = True
     if st.session_state['show_submit'] and st.button("Submit"):
@@ -254,16 +313,15 @@ def order_details_page():
     # Success banner and message
     if 'success' in st.session_state:
         st.success("SF Delivery Number updated successfully!", icon="✅")
-        # Determine language based on entire row
         row_text = ' '.join(str(order_row[col]) for col in order_row.index)
         has_chinese = bool(re.search(r'[\u4e00-\u9fff]', row_text))
         if 'message_lang' not in st.session_state:
-            st.session_state['message_lang'] = 'default'  # Initialize language state
+            st.session_state['message_lang'] = 'default'
 
         if has_chinese and st.session_state['message_lang'] in ['default', 'zh']:
             message = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持🫡"
             st.text_area("", value=message, height=100, disabled=True, key="message_chinese")
-            if st.button("Copy Message"):
+            if st.button("Copy", key="copy_message_chinese"):
                 copy_to_clipboard(message)
             if st.button("English"):
                 st.session_state['message_lang'] = 'en'
@@ -271,7 +329,7 @@ def order_details_page():
         else:
             message = f"SF Delivery Number: {st.session_state['sf_delivery']}\nHello shoes are sent. Please leave a 5 star review when receiving the product. Have a nice day."
             st.text_area("", value=message, height=100, disabled=True, key="message_english")
-            if st.button("Copy Message"):
+            if st.button("Copy", key="copy_message_english"):
                 copy_to_clipboard(message)
             if st.button("中文"):
                 st.session_state['message_lang'] = 'zh'
@@ -281,6 +339,7 @@ def order_details_page():
             if update_order_status(st.session_state['selected_order'], "Delivered"):
                 st.session_state['success'] = False
                 st.session_state['page'] = 'Pending Orders'
+                reset_page_state('Pending Orders')
                 st.rerun()
             else:
                 st.error("Failed to update order status.")
@@ -311,117 +370,113 @@ def order_completed_page():
     st.write(f"SF Delivery Number: {order_row['SF Delivery Number']}")
 
 # Main App
-# Commented out login call (will uncomment later as requested)
-# check_login()
-
-if 'page' not in st.session_state:
-    st.session_state['page'] = 'Home'
-
-if st.session_state['page'] == 'Home':
-    home_page()
-elif st.session_state['page'] == 'Book Keeping':
-    st.title("Transaction Record")
-    def go_home():
+if 'auth_state' not in st.session_state or st.session_state['auth_state'] != 'authenticated':
+    google_login()
+else:
+    if 'page' not in st.session_state:
         st.session_state['page'] = 'Home'
-    st.button("Home", key="home_button", on_click=go_home)
-    # Add two lines of space
-    st.write("")
-    st.write("")
-    # Mobile-friendly and text wrapping
-    st.markdown("""
-    <style>
-    .stTextInput, .stTextArea { width: 100% !important; }
-    .stDataFrame { width: 100%; overflow-x: auto; }
-    .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
-    .home-button button { background: none; border: none; font-size: 16px; color: #666666; cursor: pointer; padding: 0; }
-    </style>
-    """, unsafe_allow_html=True)
-    st.markdown('<h3 style="font-size: 1.4em;">Paste transaction here.</h3>', unsafe_allow_html=True)
-    template_text = st.text_area("", height=200)  # Empty label, larger height for visibility
-    if 'show_button' not in st.session_state:
-        st.session_state['show_button'] = True
-    if st.session_state['show_button'] and st.button("Process and Add"):
-        if template_text:
-            order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number = extract_data(template_text)
-            if all([item, color, size, name, phone, address]):  # Check only extracted fields
-                result = add_to_sheet(order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number)
-                if result is True:
-                    st.session_state['success'] = True
-                    st.session_state['show_button'] = False  # Hide button on success
+
+    if st.session_state['page'] == 'Home':
+        home_page()
+    elif st.session_state['page'] == 'Book Keeping':
+        reset_page_state('Book Keeping')  # Reset state on entry
+        st.title("Transaction Record")
+        def go_home():
+            st.session_state['page'] = 'Home'
+        st.button("Home", key="home_button", on_click=go_home)
+        st.write("")
+        st.write("")
+        st.markdown("""
+        <style>
+        .stTextInput, .stTextArea { width: 100% !important; }
+        .stDataFrame { width: 100%; overflow-x: auto; }
+        .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
+        </style>
+        """, unsafe_allow_html=True)
+        st.markdown('<h3 style="font-size: 1.4em;">Paste transaction here.</h3>', unsafe_allow_html=True)
+        template_text = st.text_area("", height=200, key="template_text", value=st.session_state.get('template_text', ""))
+        if 'show_button' not in st.session_state:
+            st.session_state['show_button'] = True
+        if st.session_state['show_button'] and st.button("Process and Add"):
+            if template_text:
+                order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number = extract_data(template_text)
+                if all([item, color, size, name, phone, address]):
+                    result = add_to_sheet(order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number)
+                    if result is True:
+                        st.session_state['success'] = True
+                        st.session_state['show_button'] = False
+                    else:
+                        st.session_state['error'] = result
+                    st.rerun()
                 else:
-                    st.session_state['error'] = result
+                    st.error("Couldn't extract all required data. Check template.")
+            else:
+                st.error("Enter template text.")
+
+        if 'success' in st.session_state:
+            st.success("Entry added successfully!", icon="✅")
+            if st.button("Add Another Entry"):
+                del st.session_state['success']
+                st.session_state['show_button'] = True
+                st.session_state['template_text'] = ""
                 st.rerun()
+        elif 'error' in st.session_state:
+            st.error(f"Failed to add entry: {st.session_state['error']}")
+            if st.button("Home"):
+                st.session_state['page'] = 'Home'
+                del st.session_state['error']
+                st.rerun()
+
+    elif st.session_state['page'] == 'Pending Orders':
+        pending_orders_page()
+    elif st.session_state['page'] == 'Order Details':
+        order_details_page()
+    elif st.session_state['page'] == 'Order Completed':
+        order_completed_page()
+    elif st.session_state['page'] == 'Record Checking':
+        col1, col2 = st.columns([8, 1])
+        with col1:
+            st.title("Transaction Record")
+        with col2:
+            def go_home_record():
+                st.session_state['page'] = 'Home'
+            st.button("Home", key="home_button_record", on_click=go_home_record)
+        st.markdown("""
+        <style>
+        .stTextInput, .stTextArea { width: 100% !important; }
+        .stDataFrame { width: 100%; overflow-x: auto; }
+        .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
+        </style>
+        """, unsafe_allow_html=True)
+        st.header("Record Checking")
+        query = st.text_input("Enter search terms (e.g., date, shoe model, name)")
+        if st.button("Search"):
+            if query:
+                results = search_sheet(query)
+                if not results.empty:
+                    st.dataframe(results, use_container_width=True)
+                else:
+                    st.warning("No matches found.")
             else:
-                st.error("Couldn't extract all required data. Check template.")
-        else:
-            st.error("Enter template text.")
+                st.error("Enter search terms.")
 
-    # Success or Error page
-    if 'success' in st.session_state:
-        st.success("Entry added successfully!", icon="✅")
-        if st.button("Add Another Entry"):
-            del st.session_state['success']
-            st.session_state['show_button'] = True  # Show button again
-            st.rerun()
-    elif 'error' in st.session_state:
-        st.error(f"Failed to add entry: {st.session_state['error']}")
-        if st.button("Home"):  # Changed to Home button
-            st.session_state['page'] = 'Home'
-            del st.session_state['error']
-            st.rerun()
-
-elif st.session_state['page'] == 'Pending Orders':
-    pending_orders_page()
-elif st.session_state['page'] == 'Order Details':
-    order_details_page()
-elif st.session_state['page'] == 'Order Completed':
-    order_completed_page()
-elif st.session_state['page'] == 'Record Checking':
-    col1, col2 = st.columns([8, 1])  # Adjust ratio to give more space to title
-    with col1:
-        st.title("Transaction Record")
-    with col2:
-        def go_home_record():
-            st.session_state['page'] = 'Home'
-        st.button("Home", key="home_button_record", on_click=go_home_record)
-    st.markdown("""
-    <style>
-    .stTextInput, .stTextArea { width: 100% !important; }
-    .stDataFrame { width: 100%; overflow-x: auto; }
-    .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
-    .home-button button { background: none; border: none; font-size: 16px; color: #666666; cursor: pointer; padding: 0; }
-    </style>
-    """, unsafe_allow_html=True)
-    st.header("Record Checking")
-    query = st.text_input("Enter search terms (e.g., date, shoe model, name)")
-    if st.button("Search"):
-        if query:
-            results = search_sheet(query)
-            if not results.empty:
-                st.dataframe(results, use_container_width=True)
-            else:
-                st.warning("No matches found.")
-        else:
-            st.error("Enter search terms.")
-
-elif st.session_state['page'] == 'Quick Responses':
-    col1, col2 = st.columns([8, 1])  # Adjust ratio to give more space to title
-    with col1:
-        st.title("Transaction Record")
-    with col2:
-        def go_home_quick():
-            st.session_state['page'] = 'Home'
-        st.button("Home", key="home_button_quick", on_click=go_home_quick)
-    st.markdown("""
-    <style>
-    .stTextInput, .stTextArea { width: 100% !important; }
-    .stDataFrame { width: 100%; overflow-x: auto; }
-    .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
-    .home-button button { background: none; border: none; font-size: 16px; color: #666666; cursor: pointer; padding: 0; }
-    </style>
-    """, unsafe_allow_html=True)
-    st.header("Quick Responses")
-    for response in quick_responses:
-        st.write(response)
-        copy_to_clipboard(response)
-
+    elif st.session_state['page'] == 'Quick Responses':
+        col1, col2 = st.columns([8, 1])
+        with col1:
+            st.title("Transaction Record")
+        with col2:
+            def go_home_quick():
+                st.session_state['page'] = 'Home'
+            st.button("Home", key="home_button_quick", on_click=go_home_quick)
+        st.markdown("""
+        <style>
+        .stTextInput, .stTextArea { width: 100% !important; }
+        .stDataFrame { width: 100%; overflow-x: auto; }
+        .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
+        </style>
+        """, unsafe_allow_html=True)
+        st.header("Quick Responses")
+        for response in quick_responses:
+            st.write(response)
+            if st.button("Copy", key=f"copy_response_{response}"):
+                copy_to_clipboard(response)
