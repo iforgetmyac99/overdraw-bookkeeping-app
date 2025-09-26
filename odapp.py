@@ -44,9 +44,15 @@ def google_login():
     if 'auth_state' not in st.session_state:
         st.session_state['auth_state'] = 'not_authenticated'
 
-    # Google OAuth2 configuration
-    client_id = st.secrets["google_oauth"]["client_id"]
-    redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
+    try:
+        # Google OAuth2 configuration
+        client_id = st.secrets["google_oauth"]["client_id"]
+        redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
+        client_secret = st.secrets["google_oauth"]["client_secret"]
+    except KeyError as e:
+        st.error(f"Missing secret: {e}. Please check your secrets.toml or app secrets.")
+        st.stop()
+
     auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
         'client_id': client_id,
         'redirect_uri': redirect_uri,
@@ -56,9 +62,9 @@ def google_login():
         'prompt': 'consent'
     })
 
-    # Display Login button
+    # Display Login button with target="_self" for same-tab redirect
     if st.session_state['auth_state'] == 'not_authenticated':
-        st.markdown(f'<div class="login-button"><a href="{auth_url}"><button>Login with Google</button></a></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="login-button"><a href="{auth_url}" target="_self"><button>Login with Google</button></a></div>', unsafe_allow_html=True)
         st.stop()
 
     # Handle OAuth callback
@@ -70,18 +76,29 @@ def google_login():
         token_data = {
             'code': code,
             'client_id': client_id,
-            'client_secret': st.secrets["google_oauth"]["client_secret"],
+            'client_secret': client_secret,
             'redirect_uri': redirect_uri,
             'grant_type': 'authorization_code'
         }
         response = requests.post(token_url, data=token_data)
+        if response.status_code != 200:
+            st.error(f"Token exchange failed: {response.text}")
+            st.session_state['auth_state'] = 'not_authenticated'
+            st.stop()
+
         token_json = response.json()
 
         if 'access_token' in token_json:
             # Get user info
             user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo"
             headers = {'Authorization': f"Bearer {token_json['access_token']}"}
-            user_info = requests.get(user_info_url, headers=headers).json()
+            user_response = requests.get(user_info_url, headers=headers)
+            if user_response.status_code != 200:
+                st.error(f"User info fetch failed: {user_response.text}")
+                st.session_state['auth_state'] = 'not_authenticated'
+                st.stop()
+
+            user_info = user_response.json()
 
             # Check if the email is allowed
             allowed_email = "ryantlyu1018@gmail.com"
@@ -279,7 +296,7 @@ def order_details_page():
 
     # Display order details with copy buttons (Task 5: Unified "Copy" label)
     st.write(f"**Order Number:** {order_row['Order']}")
-    st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {row['Color']}, Size: {row['Size']})")
+    st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})")
     st.write(f"**Name:**")
     st.text_area("", value=order_row['Name'], height=50, disabled=True, key="name_box")
     if st.button("Copy", key="copy_name"):
