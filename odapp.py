@@ -264,6 +264,7 @@ def pending_orders_page():
         reset_page_state(st.session_state['page'])
         st.rerun()
 
+
 # Order Details page
 def order_details_page():
     col1, col2 = st.columns([8, 1])
@@ -290,7 +291,7 @@ def order_details_page():
     </script>
     """, unsafe_allow_html=True)
 
-    if Ensuite 'selected_order' not in st.session_state:
+    if 'selected_order' not in st.session_state:
         st.error("No order selected. Please go back to Pending Orders.")
         return
 
@@ -561,3 +562,4 @@ else:
             st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
             reset_page_state(st.session_state['page'])
             st.rerun()
+
