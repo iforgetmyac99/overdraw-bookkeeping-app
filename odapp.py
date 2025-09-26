@@ -8,8 +8,6 @@ import re
 from datetime import datetime
 from builtins import max
 from st_clipboard import copy_to_clipboard  # For reliable clipboard copying
-import requests
-from urllib.parse import urlencode
 
 # Google Sheets config with environment variable support
 @st.cache_resource
@@ -30,14 +28,16 @@ def reset_page_state(page):
     elif page == 'Order Details':
         st.session_state['sf_input'] = ""  # Clear SF delivery input
 
-# Google OAuth2 Login
-def google_login():
+# Simple Username/Password Login
+def simple_login():
     st.markdown("""
     <style>
     .main-header { text-align: center; margin-bottom: 2rem; }
-    .login-button { display: flex; justify-content: center; align-items: center; }
+    .login-container { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .login-button { margin-top: 1rem; }
     .login-button button { background-color: #4285F4; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; }
     .login-button button:hover { background-color: #357ae8; }
+    .stTextInput { width: 300px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -46,78 +46,23 @@ def google_login():
     if 'auth_state' not in st.session_state:
         st.session_state['auth_state'] = 'not_authenticated'
 
-    try:
-        # Google OAuth2 configuration
-        client_id = st.secrets["google_oauth"]["client_id"]
-        redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
-        client_secret = st.secrets["google_oauth"]["client_secret"]
-    except KeyError as e:
-        st.error(f"Missing secret: {e}. Please check your secrets.toml or app secrets.")
-        st.stop()
-
-    auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
-        'client_id': client_id,
-        'redirect_uri': redirect_uri,
-        'response_type': 'code',
-        'scope': 'email profile',
-        'access_type': 'offline',
-        'prompt': 'consent'
-    })
-
-    # Display Login button with target="_self" for same-tab redirect
     if st.session_state['auth_state'] == 'not_authenticated':
-        st.markdown(f'<div class="login-button"><a href="{auth_url}" target="_self"><button>Login with Google</button></a></div>', unsafe_allow_html=True)
+        with st.form("login_form"):
+            st.markdown('<div class="login-container">', unsafe_allow_html=True)
+            username = st.text_input("Username", placeholder="Enter username")
+            password = st.text_input("Password", type="password", placeholder="Enter password")
+            submit = st.form_submit_button("Login", use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            if submit:
+                if username == "iforgetmyac" and password == "OverDraw@99":
+                    st.session_state['auth_state'] = 'authenticated'
+                    st.session_state['page'] = 'Home'
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password.")
+
         st.stop()
-
-    # Handle OAuth callback
-    query_params = st.experimental_get_query_params()
-    if 'code' in query_params:
-        code = query_params['code'][0]
-        # Exchange code for access token
-        token_url = "https://oauth2.googleapis.com/token"
-        token_data = {
-            'code': code,
-            'client_id': client_id,
-            'client_secret': client_secret,
-            'redirect_uri': redirect_uri,
-            'grant_type': 'authorization_code'
-        }
-        response = requests.post(token_url, data=token_data)
-        if response.status_code != 200:
-            st.error(f"Token exchange failed: {response.text}")
-            st.session_state['auth_state'] = 'not_authenticated'
-            st.stop()
-
-        token_json = response.json()
-
-        if 'access_token' in token_json:
-            # Get user info
-            user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo"
-            headers = {'Authorization': f"Bearer {token_json['access_token']}"}
-            user_response = requests.get(user_info_url, headers=headers)
-            if user_response.status_code != 200:
-                st.error(f"User info fetch failed: {user_response.text}")
-                st.session_state['auth_state'] = 'not_authenticated'
-                st.stop()
-
-            user_info = user_response.json()
-
-            # Check if the email is allowed
-            allowed_email = "ryantlyu1018@gmail.com"
-            if user_info.get('email') == allowed_email:
-                st.session_state['auth_state'] = 'authenticated'
-                st.session_state['user_email'] = user_info['email']
-                st.session_state['page'] = 'Home'
-                st.experimental_set_query_params()  # Clear query params
-                st.rerun()
-            else:
-                st.error("Access denied: Only ryantlyu1018@gmail.com is authorized.")
-                st.session_state['auth_state'] = 'not_authenticated'
-                st.stop()
-        else:
-            st.error("Authentication failed. Please try again.")
-            st.session_state['auth_state'] = 'not_authenticated'
-            st.stop()
 
 # Extract data from Carousell template
 def extract_data(template_text):
@@ -389,7 +334,7 @@ def order_completed_page():
 
 # Main App
 if 'auth_state' not in st.session_state or st.session_state['auth_state'] != 'authenticated':
-    google_login()
+    simple_login()
 else:
     if 'page' not in st.session_state:
         st.session_state['page'] = 'Home'
