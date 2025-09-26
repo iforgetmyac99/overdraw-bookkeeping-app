@@ -2,7 +2,6 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
-from io import BytesIO
 import os
 import re
 from datetime import datetime
@@ -16,15 +15,6 @@ def load_gspread():
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
     return gspread.authorize(creds).open_by_key('10CLEJyH7LGkZrVjc8EiicJ2PCBY_se7gALChd_YyaCg').sheet1
 
-# Custom copy button using HTML/JS for better cross-device compatibility (Task 4)
-def copy_button(text, key=None):
-    # Escape special characters for JS
-    text = text.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
-    st.markdown(
-        f'<button onclick="navigator.clipboard.writeText(\'{text}\')">Copy</button>',
-        unsafe_allow_html=True
-    )
-
 # State reset function for Task 6
 def reset_page_state(page):
     """Reset session state variables for a fresh page load."""
@@ -34,14 +24,14 @@ def reset_page_state(page):
             del st.session_state[key]
     if page == 'Book Keeping':
         if 'template_text' in st.session_state:
-            del st.session_state['template_text']  # Use del to clear widget state safely
+            del st.session_state['template_text']  # Clear widget state safely
     elif page == 'Order Details':
         st.session_state['sf_input'] = ""  # Clear SF delivery input
     elif page == 'Record Checking':
         st.session_state['search_query'] = ""  # Clear search input
-    st.session_state['last_page'] = page  # Track current page to prevent unnecessary resets
+    st.session_state['last_page'] = page  # Track current page
 
-# Login Implementation (Task 7 - already implemented, but ensuring persistence)
+# Login Implementation (Task 7, Issue 1: 10-min timeout)
 def login_page():
     st.title("OverDraw Management Portal")
     st.markdown("""
@@ -59,9 +49,10 @@ def login_page():
         if submit:
             if username == "iforgetmyac" and password == "OverDraw@99":
                 st.session_state['logged_in'] = True
-                st.session_state['page'] = 'Home'
-                st.session_state['last_activity'] = time.time()  # Initialize activity time
-                reset_page_state('Home')
+                st.session_state['last_activity'] = time.time()
+                if 'page' not in st.session_state:
+                    st.session_state['page'] = 'Home'
+                reset_page_state(st.session_state['page'])
                 st.rerun()
             else:
                 st.error("Invalid credentials.")
@@ -115,6 +106,10 @@ def extract_data(template_text):
     phone = phone_en.group(1) if phone_en else (phone_zh.group(1) if phone_zh else "")
     address = address_en.group(1).strip() if address_en else (address_zh.group(1).strip() if address_zh else "")
 
+    # Log warnings for missing fields
+    if not all([item, color, size, name, phone, address]):
+        st.warning("Some fields are missing in the template. Please verify the input.")
+
     return order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number
 
 # Add to Sheet
@@ -131,7 +126,7 @@ def search_sheet(query):
     sheet = load_gspread()
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
-    results = df[df.apply(lambda row: query.lower() in ' '.join(row.astype(str)).lower(), axis=1)]
+    results = df[df.apply(lambda row: query.lower() in ' '.join(str(col) for col in row).lower(), axis=1)]
     return results
 
 # Update SF Delivery Number
@@ -165,17 +160,21 @@ quick_responses = [
     "Sorry, item out of stock."
 ]
 
-# Callback for clearing input in Book Keeping (to avoid API exception - Task 2)
+# Callback for clearing input in Book Keeping
 def clear_template_input():
     if 'success' in st.session_state:
         del st.session_state['success']
     st.session_state['show_button'] = True
     if 'template_text' in st.session_state:
-        del st.session_state['template_text']  # Safely clear the widget state in callback
+        del st.session_state['template_text']
 
 # Home page
 def home_page():
-    st.title("Home Page")
+    col1, col2 = st.columns([8, 1])
+    with col1:
+        st.title("Home Page")
+    with col2:
+        st.button("Home", disabled=True, key="home_button_home")
     if st.button("Book Keeping"):
         st.session_state['page'] = 'Book Keeping'
         reset_page_state('Book Keeping')
@@ -204,7 +203,7 @@ def pending_orders_page():
             reset_page_state('Home')
         st.button("Home", key="home_button_pending", on_click=go_home)
     def refresh():
-        st.cache_data.clear()  # Clear cache for fresh data
+        st.session_state['refresh_trigger'] = time.time()  # Trigger refresh without clearing cache
         st.rerun()
     st.button("Refresh", key="refresh_button_pending", on_click=refresh)
     st.markdown("""
@@ -212,7 +211,15 @@ def pending_orders_page():
     .stTextInput, .stTextArea { width: 100% !important; }
     .stDataFrame { width: 100%; overflow-x: auto; }
     .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
+    .stTextArea textarea { user-select: all; }
     </style>
+    <script>
+    document.querySelectorAll('textarea').forEach(textarea => {
+        textarea.addEventListener('dblclick', function() {
+            this.select();
+        });
+    });
+    </script>
     """, unsafe_allow_html=True)
 
     sheet = load_gspread()
@@ -249,7 +256,15 @@ def order_details_page():
     .stTextInput, .stTextArea { width: 100% !important; }
     .stDataFrame { width: 100%; overflow-x: auto; }
     .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
+    .stTextArea textarea { user-select: all; }
     </style>
+    <script>
+    document.querySelectorAll('textarea').forEach(textarea => {
+        textarea.addEventListener('dblclick', function() {
+            this.select();
+        });
+    });
+    </script>
     """, unsafe_allow_html=True)
 
     if 'selected_order' not in st.session_state:
@@ -261,20 +276,15 @@ def order_details_page():
     df = pd.DataFrame(data)
     order_row = df[df['Order'] == st.session_state['selected_order']].iloc[0]
 
-    # Display order details with text areas and copy buttons (Task 4: Reverted to text_area for box format)
+    # Display order details in text areas without copy buttons (Issue 1)
     st.write(f"**Order Number:** {order_row['Order']}")
     st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})")
     st.write(f"**Name:**")
-    st.text_area("", value=order_row['Name'], height=50, disabled=True, key=f"name_box_{st.session_state['selected_order']}")
-    copy_button(order_row['Name'], key=f"copy_name_{st.session_state['selected_order']}")
-
+    st.text_area("", value=str(order_row['Name']) if not pd.isna(order_row['Name']) else "", height=50, disabled=True, key=f"name_box_{st.session_state['selected_order']}")
     st.write(f"**Phone:**")
-    st.text_area("", value=order_row['Phone'], height=50, disabled=True, key=f"phone_box_{st.session_state['selected_order']}")
-    copy_button(order_row['Phone'], key=f"copy_phone_{st.session_state['selected_order']}")
-
+    st.text_area("", value=str(order_row['Phone']) if not pd.isna(order_row['Phone']) else "", height=50, disabled=True, key=f"phone_box_{st.session_state['selected_order']}")
     st.write(f"**Address:**")
-    st.text_area("", value=order_row['Address'], height=100, disabled=True, key=f"address_box_{st.session_state['selected_order']}")
-    copy_button(order_row['Address'], key=f"copy_address_{st.session_state['selected_order']}")
+    st.text_area("", value=str(order_row['Address']) if not pd.isna(order_row['Address']) else "", height=100, disabled=True, key=f"address_box_{st.session_state['selected_order']}")
 
     # SF Delivery Number input
     sf_input = st.text_input("Enter SF Delivery Number", key="sf_input", value=st.session_state.get('sf_input', ""))
@@ -292,27 +302,24 @@ def order_details_page():
         else:
             st.error("Please enter a delivery number.")
 
-    # Success banner and message (Task 4: Use text_area for message box)
+    # Success banner and message in text area (Issue 1)
     if 'success' in st.session_state:
         st.success("SF Delivery Number updated successfully!", icon="✅")
-        row_text = ' '.join(str(order_row[col]) for col in order_row.index)
+        row_text = ' '.join(str(order_row[col]) if not pd.isna(order_row[col]) else '' for col in order_row.index)
         has_chinese = bool(re.search(r'[\u4e00-\u9fff]', row_text))
         if 'message_lang' not in st.session_state:
             st.session_state['message_lang'] = 'default'
 
+        st.write("**Delivery Message:**")
         if has_chinese and st.session_state['message_lang'] in ['default', 'zh']:
             message = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持🫡"
-            st.write("**Message (Chinese):**")
             st.text_area("", value=message, height=100, disabled=True, key="message_chinese")
-            copy_button(message, key="copy_message_chinese")
             if st.button("English"):
                 st.session_state['message_lang'] = 'en'
                 st.rerun()
         else:
             message = f"SF Delivery Number: {st.session_state['sf_delivery']}\nHello shoes are sent. Please leave a 5 star review when receiving the product. Have a nice day."
-            st.write("**Message (English):**")
             st.text_area("", value=message, height=100, disabled=True, key="message_english")
-            copy_button(message, key="copy_message_english")
             if st.button("中文"):
                 st.session_state['message_lang'] = 'zh'
                 st.rerun()
@@ -326,7 +333,7 @@ def order_details_page():
             else:
                 st.error("Failed to update order status.")
 
-# Order Completed page (Task 3: Added persistent Home button with columns)
+# Order Completed page
 def order_completed_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -365,13 +372,14 @@ if 'logged_in' not in st.session_state:
 if not st.session_state['logged_in']:
     login_page()
 else:
-    # Session timeout check (Task 1: 10 min idle timeout)
+    # Session timeout check (10 min idle timeout)
     current_time = time.time()
     if 'last_activity' in st.session_state:
-        if current_time - st.session_state['last_activity'] > 600:  # 10 minutes
+        if current_time - st.session_state['last_activity'] > 600:
             del st.session_state['logged_in']
             if 'page' in st.session_state:
                 del st.session_state['page']
+            reset_page_state('Login')
             st.rerun()
     st.session_state['last_activity'] = current_time
 
@@ -394,7 +402,15 @@ else:
         .stTextInput, .stTextArea { width: 100% !important; }
         .stDataFrame { width: 100%; overflow-x: auto; }
         .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
+        .stTextArea textarea { user-select: all; }
         </style>
+        <script>
+        document.querySelectorAll('textarea').forEach(textarea => {
+            textarea.addEventListener('dblclick', function() {
+                this.select();
+            });
+        });
+        </script>
         """, unsafe_allow_html=True)
         st.markdown('<h3 style="font-size: 1.4em;">Paste transaction here.</h3>', unsafe_allow_html=True)
         template_text = st.text_area("", height=200, key="template_text")
@@ -418,7 +434,7 @@ else:
 
         if 'success' in st.session_state:
             st.success("Entry added successfully!", icon="✅")
-            st.button("Add Another Entry", on_click=clear_template_input)  # Use on_click to avoid API exception (Task 2)
+            st.button("Add Another Entry", on_click=clear_template_input)
         elif 'error' in st.session_state:
             st.error(f"Failed to add entry: {st.session_state['error']}")
             if st.button("Home"):
@@ -447,7 +463,15 @@ else:
         .stTextInput, .stTextArea { width: 100% !important; }
         .stDataFrame { width: 100%; overflow-x: auto; }
         .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
+        .stTextArea textarea { user-select: all; }
         </style>
+        <script>
+        document.querySelectorAll('textarea').forEach(textarea => {
+            textarea.addEventListener('dblclick', function() {
+                this.select();
+            });
+        });
+        </script>
         """, unsafe_allow_html=True)
         st.header("Record Checking")
         query = st.text_input("Enter search terms (e.g., date, shoe model, name)", value=st.session_state.get('search_query', ""))
@@ -481,4 +505,3 @@ else:
         st.header("Quick Responses")
         for response in quick_responses:
             st.write(response)
-            copy_button(response)
