@@ -187,7 +187,13 @@ def order_details_page():
     st.title("Order Details")
     def go_home():
         st.session_state['page'] = 'Home'
-    st.button("Home", key="home_button_details", on_click=go_home)
+    def go_pending_orders():
+        st.session_state['page'] = 'Pending Orders'
+    col1, col2 = st.columns([1, 1])  # Two columns for Return and Home buttons
+    with col1:
+        st.button("Return", key="return_button", on_click=go_pending_orders)
+    with col2:
+        st.button("Home", key="home_button_details", on_click=go_home)
     st.markdown("""
     <style>
     .stTextInput, .stTextArea { width: 100% !important; }
@@ -260,34 +266,12 @@ def order_details_page():
                 st.rerun()
 
         if st.button("Finish"):
-            if 'show_dialog' not in st.session_state:
-                st.session_state['show_dialog'] = False
-            if not st.session_state['show_dialog']:
-                st.session_state['show_dialog'] = True
-                st.rerun()
-            if st.session_state['show_dialog']:
-                with st.expander("Confirm Order Completion", expanded=True):
-                    st.write("This will turn the order status to Delivered. Are you sure?")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("Yes"):
-                            if update_order_status(st.session_state['selected_order'], "Delivered"):
-                                st.session_state['show_dialog'] = False
-                                st.session_state['show_success'] = True
-                                st.rerun()
-                            else:
-                                st.error("Failed to update order status.")
-                    with col2:
-                        if st.button("No"):
-                            st.session_state['show_dialog'] = False
-                            st.rerun()
-
-        if 'show_success' in st.session_state and st.session_state['show_success']:
-            st.success("Order completed successfully!", icon="✅")
-            if st.button("OK"):
+            if update_order_status(st.session_state['selected_order'], "Delivered"):
+                st.session_state['success'] = False
                 st.session_state['page'] = 'Pending Orders'
-                del st.session_state['show_success']
                 st.rerun()
+            else:
+                st.error("Failed to update order status.")
 
 # Order Completed page
 def order_completed_page():
