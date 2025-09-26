@@ -18,7 +18,7 @@ def load_gspread():
 # State reset function
 def reset_page_state(page):
     """Reset session state variables for a fresh page load."""
-    state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger']
+    state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang', 'quick_response_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger']
     for key in state_keys:
         if key in st.session_state:
             del st.session_state[key]
@@ -28,6 +28,8 @@ def reset_page_state(page):
         st.session_state['sf_input'] = ""  # Clear SF delivery input
     elif page == 'Record Checking':
         st.session_state['search_query'] = ""  # Clear search input
+    elif page == 'Quick Responses':
+        st.session_state['quick_response_lang'] = 'en'  # Default to English
     st.session_state['last_page'] = page  # Track current page
 
 # Navigation helper
@@ -158,11 +160,142 @@ def update_order_status(order_num, status):
     return False
 
 # Quick Responses
-quick_responses = [
-    "Thank you for your purchase!",
-    "Your order has been shipped.",
-    "Sorry, item out of stock."
-]
+def quick_responses_page():
+    col1, col2 = st.columns([8, 1])
+    with col1:
+        st.title("Quick Responses")
+    with col2:
+        st.button("Home", key="home_button_quick", on_click=go_home)
+    
+    st.markdown("""
+    <style>
+    .stTextInput, .stTextArea { width: 100% !important; }
+    .stDataFrame { width: 100%; overflow-x: auto; }
+    .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
+    .stTextArea textarea { user-select: all; }
+    .item-label { margin-bottom: 0px; font-weight: bold; }
+    .item-container { margin-bottom: 20px; }
+    </style>
+    <script>
+    document.querySelectorAll('textarea').forEach(textarea => {
+        textarea.addEventListener('dblclick', function() {
+            this.select();
+        });
+    });
+    </script>
+    """, unsafe_allow_html=True)
+
+    # Language toggle buttons
+    if 'quick_response_lang' not in st.session_state:
+        st.session_state['quick_response_lang'] = 'en'  # Default to English
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("English", key="quick_english_button"):
+            st.session_state['quick_response_lang'] = 'en'
+            st.rerun()
+    with col2:
+        if st.button("中文", key="quick_chinese_button"):
+            st.session_state['quick_response_lang'] = 'zh'
+            st.rerun()
+
+    # Placeholder for item name (to be replaced by user)
+    item_placeholder = "{Item} (Color: {Color}, Size: {Size})"
+
+    # Quick response messages
+    if st.session_state['quick_response_lang'] == 'zh':
+        # 快速落單
+        st.markdown('<div class="item-container"><p class="item-label">快速落單</p>', unsafe_allow_html=True)
+        express_order_zh = f"""快速落單💨
+
+㩒一㩒「出價」同埋留低以下資料就可以快速落單㗎喇🤝🏻
+
+鞋款：{item_placeholder}
+顏色：
+碼數：
+姓名：
+電話：
+地址：
+付款方式（FPS / Payme / Alipay）：
+
+溫馨提示🥰
+貨品如非質量問題 不設退換👟
+收貨後請先作檢查✅
+已經穿著嘅鞋將不接受退換處理🚫"""
+        st.text_area("", value=express_order_zh, height=200, disabled=True, key="express_order_zh")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # 付款方法
+        st.markdown('<div class="item-container"><p class="item-label">付款方法</p>', unsafe_allow_html=True)
+        payment_method = """FPS ID
+111780946
+Yu Txx Lxx
+
+Payme
+Tap to PayMe!
+https://payme.hsbc/overdraw9"""
+        st.text_area("", value=payment_method, height=150, disabled=True, key="payment_method")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # 落單成功
+        st.markdown('<div class="item-container"><p class="item-label">落單成功</p>', unsafe_allow_html=True)
+        completed_order_zh = """唔該曬
+大約五至七日左右到貨
+寄出後會有順豐寄件編號比翻你嘅
+到時可以用順豐APP查詢寄件狀況
+多謝支持🫡"""
+        st.text_area("", value=completed_order_zh, height=150, disabled=True, key="completed_order_zh")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    else:
+        # Express Order
+        st.markdown('<div class="item-container"><p class="item-label">Express Order</p>', unsafe_allow_html=True)
+        express_order_en = f"""Express Order💨
+
+Please fill in the information below and click "Make Offer" button for placing order🤝🏻
+
+Shoe: {item_placeholder}
+Color:
+Size:
+Name:
+Phone:
+Address:
+Payment (FPS/Alipay/Payme):
+
+Warm Reminder🥰
+Refund / Exchange is only facilitated for shoes with quality issue👟
+Please check when receiving the delivery✅
+Worn shoes are not accepted as return🚫"""
+        st.text_area("", value=express_order_en, height=200, disabled=True, key="express_order_en")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Payment Method
+        st.markdown('<div class="item-container"><p class="item-label">Payment Method</p>', unsafe_allow_html=True)
+        payment_method = """FPS ID
+111780946
+Yu Txx Lxx
+
+Payme
+Tap to PayMe!
+https://payme.hsbc/overdraw9"""
+        st.text_area("", value=payment_method, height=150, disabled=True, key="payment_method")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Completed Order
+        st.markdown('<div class="item-container"><p class="item-label">Completed Order</p>', unsafe_allow_html=True)
+        completed_order_en = """Well received and Thank you for the order!
+Pre-Ordered shoes take around 5 - 7 days for stock arrival.
+SF Delivery Number will be provided after shipment being sent.
+Delivery status can be checked with the provided SF Delivery number.
+Thank you for your support and patience."""
+        st.text_area("", value=completed_order_en, height=150, disabled=True, key="completed_order_en")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Handle navigation
+    if st.session_state.get('page') != 'Quick Responses':
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state(st.session_state['page'])
+        st.rerun()
 
 # Callback for clearing input in Book Keeping
 def clear_template_input():
@@ -542,24 +675,4 @@ else:
             st.rerun()
 
     elif st.session_state['page'] == 'Quick Responses':
-        col1, col2 = st.columns([8, 1])
-        with col1:
-            st.title("Transaction Record")
-        with col2:
-            st.button("Home", key="home_button_quick", on_click=go_home)
-        st.markdown("""
-        <style>
-        .stTextInput, .stTextArea { width: 100% !important; }
-        .stDataFrame { width: 100%; overflow-x: auto; }
-        .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
-        </style>
-        """, unsafe_allow_html=True)
-        st.header("Quick Responses")
-        for response in quick_responses:
-            st.write(response)
-
-        # Handle navigation
-        if st.session_state.get('page') != 'Quick Responses':
-            st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-            reset_page_state(st.session_state['page'])
-            st.rerun()
+        quick_responses_page()
