@@ -7,7 +7,7 @@ import os
 import re
 from datetime import datetime
 from builtins import max
-from st_clipboard import copy_to_clipboard  # For reliable clipboard copying
+import time
 
 # Google Sheets config with environment variable support
 @st.cache_resource
@@ -15,6 +15,15 @@ def load_gspread():
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
     return gspread.authorize(creds).open_by_key('10CLEJyH7LGkZrVjc8EiicJ2PCBY_se7gALChd_YyaCg').sheet1
+
+# Custom copy button using HTML/JS for better cross-device compatibility (Task 4)
+def copy_button(text, key=None):
+    # Escape special characters for JS
+    text = text.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
+    st.markdown(
+        f'<button onclick="navigator.clipboard.writeText(\'{text}\')">Copy</button>',
+        unsafe_allow_html=True
+    )
 
 # State reset function for Task 6
 def reset_page_state(page):
@@ -24,14 +33,15 @@ def reset_page_state(page):
         if key in st.session_state:
             del st.session_state[key]
     if page == 'Book Keeping':
-        st.session_state['template_text'] = ""  # Clear template text input
+        if 'template_text' in st.session_state:
+            del st.session_state['template_text']  # Use del to clear widget state safely
     elif page == 'Order Details':
         st.session_state['sf_input'] = ""  # Clear SF delivery input
     elif page == 'Record Checking':
         st.session_state['search_query'] = ""  # Clear search input
     st.session_state['last_page'] = page  # Track current page to prevent unnecessary resets
 
-# Login Implementation (Task 7)
+# Login Implementation (Task 7 - already implemented, but ensuring persistence)
 def login_page():
     st.title("OverDraw Management Portal")
     st.markdown("""
@@ -50,6 +60,7 @@ def login_page():
             if username == "iforgetmyac" and password == "OverDraw@99":
                 st.session_state['logged_in'] = True
                 st.session_state['page'] = 'Home'
+                st.session_state['last_activity'] = time.time()  # Initialize activity time
                 reset_page_state('Home')
                 st.rerun()
             else:
@@ -154,6 +165,14 @@ quick_responses = [
     "Sorry, item out of stock."
 ]
 
+# Callback for clearing input in Book Keeping (to avoid API exception - Task 2)
+def clear_template_input():
+    if 'success' in st.session_state:
+        del st.session_state['success']
+    st.session_state['show_button'] = True
+    if 'template_text' in st.session_state:
+        del st.session_state['template_text']  # Safely clear the widget state in callback
+
 # Home page
 def home_page():
     st.title("Home Page")
@@ -176,17 +195,18 @@ def home_page():
 
 # Pending Orders page
 def pending_orders_page():
-    st.title("Pending Orders")
-    def go_home():
-        st.session_state['page'] = 'Home'
-        reset_page_state('Home')
+    col1, col2 = st.columns([8, 1])
+    with col1:
+        st.title("Pending Orders")
+    with col2:
+        def go_home():
+            st.session_state['page'] = 'Home'
+            reset_page_state('Home')
+        st.button("Home", key="home_button_pending", on_click=go_home)
     def refresh():
         st.cache_data.clear()  # Clear cache for fresh data
         st.rerun()
-    col1 = st.columns(1)[0]
-    with col1:
-        st.button("Home", key="home_button_pending", on_click=go_home)
-        st.button("Refresh", key="refresh_button_pending", on_click=refresh)
+    st.button("Refresh", key="refresh_button_pending", on_click=refresh)
     st.markdown("""
     <style>
     .stTextInput, .stTextArea { width: 100% !important; }
@@ -212,17 +232,18 @@ def pending_orders_page():
 
 # Order Details page
 def order_details_page():
-    st.title("Order Details")
-    def go_home():
-        st.session_state['page'] = 'Home'
-        reset_page_state('Home')
+    col1, col2 = st.columns([8, 1])
+    with col1:
+        st.title("Order Details")
+    with col2:
+        def go_home():
+            st.session_state['page'] = 'Home'
+            reset_page_state('Home')
+        st.button("Home", key="home_button_details", on_click=go_home)
     def go_pending_orders():
         st.session_state['page'] = 'Pending Orders'
         reset_page_state('Pending Orders')
-    col1 = st.columns(1)[0]
-    with col1:
-        st.button("Return", key="return_button", on_click=go_pending_orders)
-        st.button("Home", key="home_button_details", on_click=go_home)
+    st.button("Return", key="return_button", on_click=go_pending_orders)
     st.markdown("""
     <style>
     .stTextInput, .stTextArea { width: 100% !important; }
@@ -240,29 +261,20 @@ def order_details_page():
     df = pd.DataFrame(data)
     order_row = df[df['Order'] == st.session_state['selected_order']].iloc[0]
 
-    # Display order details with copy buttons (Task 5: Unified "Copy" label)
+    # Display order details with text areas and copy buttons (Task 4: Reverted to text_area for box format)
     st.write(f"**Order Number:** {order_row['Order']}")
     st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})")
-    col_name, col_copy_name = st.columns([8, 1])
-    with col_name:
-        st.write(f"**Name:** {order_row['Name']}")
-    with col_copy_name:
-        if st.button("Copy", key="copy_name"):
-            copy_to_clipboard(order_row['Name'])
+    st.write(f"**Name:**")
+    st.text_area("", value=order_row['Name'], height=50, disabled=True, key=f"name_box_{st.session_state['selected_order']}")
+    copy_button(order_row['Name'], key=f"copy_name_{st.session_state['selected_order']}")
 
-    col_phone, col_copy_phone = st.columns([8, 1])
-    with col_phone:
-        st.write(f"**Phone:** {order_row['Phone']}")
-    with col_copy_phone:
-        if st.button("Copy", key="copy_phone"):
-            copy_to_clipboard(order_row['Phone'])
+    st.write(f"**Phone:**")
+    st.text_area("", value=order_row['Phone'], height=50, disabled=True, key=f"phone_box_{st.session_state['selected_order']}")
+    copy_button(order_row['Phone'], key=f"copy_phone_{st.session_state['selected_order']}")
 
-    col_addr, col_copy_addr = st.columns([8, 1])
-    with col_addr:
-        st.write(f"**Address:** {order_row['Address']}")
-    with col_copy_addr:
-        if st.button("Copy", key="copy_address"):
-            copy_to_clipboard(order_row['Address'])
+    st.write(f"**Address:**")
+    st.text_area("", value=order_row['Address'], height=100, disabled=True, key=f"address_box_{st.session_state['selected_order']}")
+    copy_button(order_row['Address'], key=f"copy_address_{st.session_state['selected_order']}")
 
     # SF Delivery Number input
     sf_input = st.text_input("Enter SF Delivery Number", key="sf_input", value=st.session_state.get('sf_input', ""))
@@ -280,7 +292,7 @@ def order_details_page():
         else:
             st.error("Please enter a delivery number.")
 
-    # Success banner and message
+    # Success banner and message (Task 4: Use text_area for message box)
     if 'success' in st.session_state:
         st.success("SF Delivery Number updated successfully!", icon="✅")
         row_text = ' '.join(str(order_row[col]) for col in order_row.index)
@@ -288,24 +300,19 @@ def order_details_page():
         if 'message_lang' not in st.session_state:
             st.session_state['message_lang'] = 'default'
 
-        col_msg, col_copy_msg = st.columns([8, 1])
         if has_chinese and st.session_state['message_lang'] in ['default', 'zh']:
             message = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持🫡"
-            with col_msg:
-                st.write(f"**Message:** {message}")
-            with col_copy_msg:
-                if st.button("Copy", key="copy_message_chinese"):
-                    copy_to_clipboard(message)
+            st.write("**Message (Chinese):**")
+            st.text_area("", value=message, height=100, disabled=True, key="message_chinese")
+            copy_button(message, key="copy_message_chinese")
             if st.button("English"):
                 st.session_state['message_lang'] = 'en'
                 st.rerun()
         else:
             message = f"SF Delivery Number: {st.session_state['sf_delivery']}\nHello shoes are sent. Please leave a 5 star review when receiving the product. Have a nice day."
-            with col_msg:
-                st.write(f"**Message:** {message}")
-            with col_copy_msg:
-                if st.button("Copy", key="copy_message_english"):
-                    copy_to_clipboard(message)
+            st.write("**Message (English):**")
+            st.text_area("", value=message, height=100, disabled=True, key="message_english")
+            copy_button(message, key="copy_message_english")
             if st.button("中文"):
                 st.session_state['message_lang'] = 'zh'
                 st.rerun()
@@ -319,13 +326,16 @@ def order_details_page():
             else:
                 st.error("Failed to update order status.")
 
-# Order Completed page
+# Order Completed page (Task 3: Added persistent Home button with columns)
 def order_completed_page():
-    st.title("Order Completed")
-    def go_home():
-        st.session_state['page'] = 'Home'
-        reset_page_state('Home')
-    st.button("Home", key="home_button_completed", on_click=go_home)
+    col1, col2 = st.columns([8, 1])
+    with col1:
+        st.title("Order Completed")
+    with col2:
+        def go_home():
+            st.session_state['page'] = 'Home'
+            reset_page_state('Home')
+        st.button("Home", key="home_button_completed", on_click=go_home)
     if 'selected_order' not in st.session_state:
         st.error("No order selected.")
         return
@@ -355,19 +365,30 @@ if 'logged_in' not in st.session_state:
 if not st.session_state['logged_in']:
     login_page()
 else:
+    # Session timeout check (Task 1: 10 min idle timeout)
+    current_time = time.time()
+    if 'last_activity' in st.session_state:
+        if current_time - st.session_state['last_activity'] > 600:  # 10 minutes
+            del st.session_state['logged_in']
+            if 'page' in st.session_state:
+                del st.session_state['page']
+            st.rerun()
+    st.session_state['last_activity'] = current_time
+
     if 'page' not in st.session_state:
         st.session_state['page'] = 'Home'
 
     if st.session_state['page'] == 'Home':
         home_page()
     elif st.session_state['page'] == 'Book Keeping':
-        st.title("Transaction Record")
-        def go_home():
-            st.session_state['page'] = 'Home'
-            reset_page_state('Home')
-        st.button("Home", key="home_button", on_click=go_home)
-        st.write("")
-        st.write("")
+        col1, col2 = st.columns([8, 1])
+        with col1:
+            st.title("Transaction Record")
+        with col2:
+            def go_home():
+                st.session_state['page'] = 'Home'
+                reset_page_state('Home')
+            st.button("Home", key="home_button", on_click=go_home)
         st.markdown("""
         <style>
         .stTextInput, .stTextArea { width: 100% !important; }
@@ -376,7 +397,7 @@ else:
         </style>
         """, unsafe_allow_html=True)
         st.markdown('<h3 style="font-size: 1.4em;">Paste transaction here.</h3>', unsafe_allow_html=True)
-        template_text = st.text_area("", height=200, key="template_text", value=st.session_state.get('template_text', ""))
+        template_text = st.text_area("", height=200, key="template_text")
         if 'show_button' not in st.session_state:
             st.session_state['show_button'] = True
         if st.session_state['show_button'] and st.button("Process and Add"):
@@ -397,12 +418,7 @@ else:
 
         if 'success' in st.session_state:
             st.success("Entry added successfully!", icon="✅")
-            if st.button("Add Another Entry"):
-                del st.session_state['success']
-                st.session_state['show_button'] = True
-                st.session_state['template_text'] = ""
-                reset_page_state('Book Keeping')
-                st.rerun()
+            st.button("Add Another Entry", on_click=clear_template_input)  # Use on_click to avoid API exception (Task 2)
         elif 'error' in st.session_state:
             st.error(f"Failed to add entry: {st.session_state['error']}")
             if st.button("Home"):
@@ -464,9 +480,5 @@ else:
         """, unsafe_allow_html=True)
         st.header("Quick Responses")
         for response in quick_responses:
-            col_resp, col_copy = st.columns([8, 1])
-            with col_resp:
-                st.write(response)
-            with col_copy:
-                if st.button("Copy", key=f"copy_response_{response}"):
-                    copy_to_clipboard(response)
+            st.write(response)
+            copy_button(response)
