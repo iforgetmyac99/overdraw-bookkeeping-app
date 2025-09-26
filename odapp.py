@@ -189,10 +189,10 @@ def order_details_page():
         st.session_state['page'] = 'Home'
     def go_pending_orders():
         st.session_state['page'] = 'Pending Orders'
-    col1, col2 = st.columns([1, 1])  # Two columns for Return and Home buttons
+    # Place Return and Home buttons vertically aligned
+    col1 = st.columns(1)[0]  # Single column for vertical alignment
     with col1:
         st.button("Return", key="return_button", on_click=go_pending_orders)
-    with col2:
         st.button("Home", key="home_button_details", on_click=go_home)
     st.markdown("""
     <style>
