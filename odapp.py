@@ -48,7 +48,7 @@ def google_login():
     # Google OAuth2 configuration
     client_id = st.secrets["google_oauth"]["client_id"]
     redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
-    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode({
+    auth_url = "https://accounts.google.com/o/oauth2/v2/auth?{urlencode({
         'client_id': client_id,
         'redirect_uri': redirect_uri,
         'response_type': 'code',
@@ -480,3 +480,4 @@ else:
             st.write(response)
             if st.button("Copy", key=f"copy_response_{response}"):
                 copy_to_clipboard(response)
+
