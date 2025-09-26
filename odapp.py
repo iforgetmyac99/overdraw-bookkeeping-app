@@ -32,14 +32,16 @@ def reset_page_state(page):
 
 # Google OAuth2 Login
 def google_login():
-    st.title("OverDraw Management Portal")
     st.markdown("""
     <style>
-    .login-button { display: flex; justify-content: center; }
+    .main-header { text-align: center; margin-bottom: 2rem; }
+    .login-button { display: flex; justify-content: center; align-items: center; }
     .login-button button { background-color: #4285F4; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; }
     .login-button button:hover { background-color: #357ae8; }
     </style>
     """, unsafe_allow_html=True)
+
+    st.markdown('<div class="main-header"><h1>OverDraw Management Portal</h1></div>', unsafe_allow_html=True)
 
     if 'auth_state' not in st.session_state:
         st.session_state['auth_state'] = 'not_authenticated'
