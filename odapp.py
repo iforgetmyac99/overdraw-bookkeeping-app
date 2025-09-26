@@ -18,12 +18,12 @@ def load_gspread():
 # State reset function
 def reset_page_state(page):
     """Reset session state variables for a fresh page load."""
-    state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang', 'template_text', 'sf_input', 'search_query', 'refresh_trigger']
+    state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger']
     for key in state_keys:
         if key in st.session_state:
             del st.session_state[key]
     if page == 'Book Keeping':
-        st.session_state['template_text'] = ""  # Ensure text box is empty
+        st.session_state['input_text'] = ""  # Ensure text box is empty
     elif page == 'Order Details':
         st.session_state['sf_input'] = ""  # Clear SF delivery input
     elif page == 'Record Checking':
@@ -36,7 +36,7 @@ def go_home():
     st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
     reset_page_state('Home')
 
-# Login Implementation (Issue 1: Start at Home page on new login)
+# Login Implementation
 def login_page():
     st.title("OverDraw Management Portal")
     st.markdown("""
@@ -169,7 +169,7 @@ def clear_template_input():
     if 'success' in st.session_state:
         del st.session_state['success']
     st.session_state['show_button'] = True
-    st.session_state['template_text'] = ""  # Clear text box for next entry
+    st.session_state['input_text'] = ""  # Clear text box for next entry
 
 # Home page
 def home_page():
@@ -455,7 +455,7 @@ else:
         </script>
         """, unsafe_allow_html=True)
         st.markdown('<h3 style="font-size: 1.4em;">Paste transaction here.</h3>', unsafe_allow_html=True)
-        template_text = st.text_area("", value=st.session_state.get('template_text', ""), height=200, key="template_text")
+        template_text = st.text_area("", value=st.session_state.get('input_text', ""), height=200, key="template_text")
         if 'show_button' not in st.session_state:
             st.session_state['show_button'] = True
         if st.session_state['show_button'] and st.button("Process and Add"):
@@ -466,10 +466,11 @@ else:
                     if result is True:
                         st.session_state['success'] = True
                         st.session_state['show_button'] = False
-                        st.session_state['template_text'] = ""  # Clear text box
+                        st.session_state['input_text'] = ""  # Clear text box
+                        st.rerun()
                     else:
                         st.session_state['error'] = result
-                    st.rerun()
+                        st.rerun()
                 else:
                     st.error("Couldn't extract all required data. Check template.")
             else:
