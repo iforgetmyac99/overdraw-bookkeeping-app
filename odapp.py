@@ -52,6 +52,7 @@ def login_page():
                 st.session_state['last_activity'] = time.time()
                 if 'page' not in st.session_state:
                     st.session_state['page'] = 'Home'
+                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
                 reset_page_state(st.session_state['page'])
                 st.rerun()
             else:
@@ -177,22 +178,34 @@ def home_page():
         st.button("Home", disabled=True, key="home_button_home")
     if st.button("Book Keeping"):
         st.session_state['page'] = 'Book Keeping'
+        st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
         reset_page_state('Book Keeping')
         st.rerun()
     if st.button("Pending Orders"):
         st.session_state['page'] = 'Pending Orders'
+        st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
         reset_page_state('Pending Orders')
         st.rerun()
     if st.button("Record Checking"):
         st.session_state['page'] = 'Record Checking'
+        st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
         reset_page_state('Record Checking')
         st.rerun()
     if st.button("Quick Responses"):
         st.session_state['page'] = 'Quick Responses'
+        st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
         reset_page_state('Quick Responses')
         st.rerun()
 
 # Pending Orders page
+@st.cache_data
+def get_pending_df():
+    sheet = load_gspread()
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data)
+    pending_df = df[df['Status'] == 'Pending'][['Order', 'Item', 'Color', 'Size']].dropna()
+    return pending_df
+
 def pending_orders_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -200,10 +213,11 @@ def pending_orders_page():
     with col2:
         def go_home():
             st.session_state['page'] = 'Home'
+            st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
             reset_page_state('Home')
         st.button("Home", key="home_button_pending", on_click=go_home)
     def refresh():
-        st.session_state['refresh_trigger'] = time.time()  # Trigger refresh without clearing cache
+        get_pending_df.clear()  # Clear specific cache to fetch fresh data
         st.rerun()
     st.button("Refresh", key="refresh_button_pending", on_click=refresh)
     st.markdown("""
@@ -222,16 +236,14 @@ def pending_orders_page():
     </script>
     """, unsafe_allow_html=True)
 
-    sheet = load_gspread()
-    data = sheet.get_all_records()
-    df = pd.DataFrame(data)
-    pending_df = df[df['Status'] == 'Pending'][['Order', 'Item', 'Color', 'Size']].dropna()
+    pending_df = get_pending_df()
 
     if not pending_df.empty:
         for index, row in pending_df.iterrows():
             if st.button(f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})", key=f"order_{row['Order']}"):
                 st.session_state['selected_order'] = row['Order']
                 st.session_state['page'] = 'Order Details'
+                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
                 reset_page_state('Order Details')
                 st.rerun()
     else:
@@ -245,10 +257,12 @@ def order_details_page():
     with col2:
         def go_home():
             st.session_state['page'] = 'Home'
+            st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
             reset_page_state('Home')
         st.button("Home", key="home_button_details", on_click=go_home)
     def go_pending_orders():
         st.session_state['page'] = 'Pending Orders'
+        st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
         reset_page_state('Pending Orders')
     st.button("Return", key="return_button", on_click=go_pending_orders)
     st.markdown("""
@@ -328,6 +342,7 @@ def order_details_page():
             if update_order_status(st.session_state['selected_order'], "Delivered"):
                 st.session_state['success'] = False
                 st.session_state['page'] = 'Pending Orders'
+                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
                 reset_page_state('Pending Orders')
                 st.rerun()
             else:
@@ -341,6 +356,7 @@ def order_completed_page():
     with col2:
         def go_home():
             st.session_state['page'] = 'Home'
+            st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
             reset_page_state('Home')
         st.button("Home", key="home_button_completed", on_click=go_home)
     if 'selected_order' not in st.session_state:
@@ -366,25 +382,31 @@ def order_completed_page():
     st.write(f"SF Delivery Number: {order_row['SF Delivery Number']}")
 
 # Main App
-if 'logged_in' not in st.session_state:
-    st.session_state['logged_in'] = False
+query_params = st.experimental_get_query_params()
+if 'logged_in' in query_params and query_params['logged_in'][0] == 'true':
+    st.session_state['logged_in'] = True
+    if 'page' in query_params:
+        st.session_state['page'] = query_params['page'][0]
 
-if not st.session_state['logged_in']:
+if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
     login_page()
 else:
     # Session timeout check (10 min idle timeout)
     current_time = time.time()
-    if 'last_activity' in st.session_state:
-        if current_time - st.session_state['last_activity'] > 600:
-            del st.session_state['logged_in']
-            if 'page' in st.session_state:
-                del st.session_state['page']
-            reset_page_state('Login')
-            st.rerun()
+    if 'last_activity' not in st.session_state:
+        st.session_state['last_activity'] = current_time
+    if current_time - st.session_state['last_activity'] > 600:
+        del st.session_state['logged_in']
+        if 'page' in st.session_state:
+            del st.session_state['page']
+        st.experimental_set_query_params()
+        reset_page_state('Login')
+        st.rerun()
     st.session_state['last_activity'] = current_time
 
     if 'page' not in st.session_state:
         st.session_state['page'] = 'Home'
+        st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
 
     if st.session_state['page'] == 'Home':
         home_page()
@@ -395,6 +417,7 @@ else:
         with col2:
             def go_home():
                 st.session_state['page'] = 'Home'
+                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
                 reset_page_state('Home')
             st.button("Home", key="home_button", on_click=go_home)
         st.markdown("""
@@ -440,6 +463,7 @@ else:
             if st.button("Home"):
                 st.session_state['page'] = 'Home'
                 del st.session_state['error']
+                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
                 reset_page_state('Home')
                 st.rerun()
 
@@ -456,6 +480,7 @@ else:
         with col2:
             def go_home_record():
                 st.session_state['page'] = 'Home'
+                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
                 reset_page_state('Home')
             st.button("Home", key="home_button_record", on_click=go_home_record)
         st.markdown("""
@@ -493,6 +518,7 @@ else:
         with col2:
             def go_home_quick():
                 st.session_state['page'] = 'Home'
+                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
                 reset_page_state('Home')
             st.button("Home", key="home_button_quick", on_click=go_home_quick)
         st.markdown("""
