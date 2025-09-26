@@ -8,8 +8,6 @@ import re
 from datetime import datetime
 from builtins import max
 from st_clipboard import copy_to_clipboard  # For reliable clipboard copying
-import requests
-from urllib.parse import urlencode
 
 # Google Sheets config with environment variable support
 @st.cache_resource
@@ -21,7 +19,7 @@ def load_gspread():
 # State reset function for Task 6
 def reset_page_state(page):
     """Reset session state variables for a fresh page load."""
-    state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang']
+    state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang', 'template_text', 'sf_input', 'search_query']
     for key in state_keys:
         if key in st.session_state:
             del st.session_state[key]
@@ -29,76 +27,33 @@ def reset_page_state(page):
         st.session_state['template_text'] = ""  # Clear template text input
     elif page == 'Order Details':
         st.session_state['sf_input'] = ""  # Clear SF delivery input
+    elif page == 'Record Checking':
+        st.session_state['search_query'] = ""  # Clear search input
+    st.session_state['last_page'] = page  # Track current page to prevent unnecessary resets
 
-# Google OAuth2 Login
-def google_login():
+# Login Implementation (Task 7)
+def login_page():
     st.title("OverDraw Management Portal")
     st.markdown("""
     <style>
-    .login-button { display: flex; justify-content: center; }
-    .login-button button { background-color: #4285F4; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; }
-    .login-button button:hover { background-color: #357ae8; }
+    .login-form { max-width: 400px; margin: 0 auto; }
+    .login-form input { width: 100% !important; }
+    .login-form button { background-color: #4CAF50; color: white; padding: 10px; width: 100%; }
     </style>
     """, unsafe_allow_html=True)
-
-    if 'auth_state' not in st.session_state:
-        st.session_state['auth_state'] = 'not_authenticated'
-
-    # Google OAuth2 configuration
-    client_id = st.secrets["google_oauth"]["client_id"]
-    redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
-    auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
-        'client_id': client_id,
-        'redirect_uri': redirect_uri,
-        'response_type': 'code',
-        'scope': 'email profile',
-        'access_type': 'offline',
-        'prompt': 'consent'
-    })
-
-    # Display Login button
-    if st.session_state['auth_state'] == 'not_authenticated':
-        st.markdown(f'<div class="login-button"><a href="{auth_url}"><button>Login with Google</button></a></div>', unsafe_allow_html=True)
-        st.stop()
-
-    # Handle OAuth callback
-    query_params = st.experimental_get_query_params()
-    if 'code' in query_params:
-        code = query_params['code'][0]
-        # Exchange code for access token
-        token_url = "https://oauth2.googleapis.com/token"
-        token_data = {
-            'code': code,
-            'client_id': client_id,
-            'client_secret': st.secrets["google_oauth"]["client_secret"],
-            'redirect_uri': redirect_uri,
-            'grant_type': 'authorization_code'
-        }
-        response = requests.post(token_url, data=token_data)
-        token_json = response.json()
-
-        if 'access_token' in token_json:
-            # Get user info
-            user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo"
-            headers = {'Authorization': f"Bearer {token_json['access_token']}"}
-            user_info = requests.get(user_info_url, headers=headers).json()
-
-            # Check if the email is allowed
-            allowed_email = "ryantlyu1018@gmail.com"
-            if user_info.get('email') == allowed_email:
-                st.session_state['auth_state'] = 'authenticated'
-                st.session_state['user_email'] = user_info['email']
+    
+    with st.form("login_form", clear_on_submit=True):
+        username = st.text_input("Account")
+        password = st.text_input("Password", type="password")
+        submit = st.form_submit_button("Login")
+        if submit:
+            if username == "iforgetmyac" and password == "OverDraw@99":
+                st.session_state['logged_in'] = True
                 st.session_state['page'] = 'Home'
-                st.experimental_set_query_params()  # Clear query params
+                reset_page_state('Home')
                 st.rerun()
             else:
-                st.error("Access denied: Only ryantlyu1018@gmail.com is authorized.")
-                st.session_state['auth_state'] = 'not_authenticated'
-                st.stop()
-        else:
-            st.error("Authentication failed. Please try again.")
-            st.session_state['auth_state'] = 'not_authenticated'
-            st.stop()
+                st.error("Invalid credentials.")
 
 # Extract data from Carousell template
 def extract_data(template_text):
@@ -210,13 +165,21 @@ def home_page():
         st.session_state['page'] = 'Pending Orders'
         reset_page_state('Pending Orders')
         st.rerun()
+    if st.button("Record Checking"):
+        st.session_state['page'] = 'Record Checking'
+        reset_page_state('Record Checking')
+        st.rerun()
+    if st.button("Quick Responses"):
+        st.session_state['page'] = 'Quick Responses'
+        reset_page_state('Quick Responses')
+        st.rerun()
 
 # Pending Orders page
 def pending_orders_page():
-    reset_page_state('Pending Orders')  # Reset state on entry
     st.title("Pending Orders")
     def go_home():
         st.session_state['page'] = 'Home'
+        reset_page_state('Home')
     def refresh():
         st.cache_data.clear()  # Clear cache for fresh data
         st.rerun()
@@ -249,10 +212,10 @@ def pending_orders_page():
 
 # Order Details page
 def order_details_page():
-    reset_page_state('Order Details')  # Reset state on entry
     st.title("Order Details")
     def go_home():
         st.session_state['page'] = 'Home'
+        reset_page_state('Home')
     def go_pending_orders():
         st.session_state['page'] = 'Pending Orders'
         reset_page_state('Pending Orders')
@@ -279,22 +242,30 @@ def order_details_page():
 
     # Display order details with copy buttons (Task 5: Unified "Copy" label)
     st.write(f"**Order Number:** {order_row['Order']}")
-    st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {row['Color']}, Size: {row['Size']})")
-    st.write(f"**Name:**")
-    st.text_area("", value=order_row['Name'], height=50, disabled=True, key="name_box")
-    if st.button("Copy", key="copy_name"):
-        copy_to_clipboard(order_row['Name'])
-    st.write(f"**Phone:**")
-    st.text_area("", value=order_row['Phone'], height=50, disabled=True, key="phone_box")
-    if st.button("Copy", key="copy_phone"):
-        copy_to_clipboard(order_row['Phone'])
-    st.write(f"**Address:**")
-    st.text_area("", value=order_row['Address'], height=100, disabled=True, key="address_box")
-    if st.button("Copy", key="copy_address"):
-        copy_to_clipboard(order_row['Address'])
+    st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})")
+    col_name, col_copy_name = st.columns([8, 1])
+    with col_name:
+        st.write(f"**Name:** {order_row['Name']}")
+    with col_copy_name:
+        if st.button("Copy", key="copy_name"):
+            copy_to_clipboard(order_row['Name'])
+
+    col_phone, col_copy_phone = st.columns([8, 1])
+    with col_phone:
+        st.write(f"**Phone:** {order_row['Phone']}")
+    with col_copy_phone:
+        if st.button("Copy", key="copy_phone"):
+            copy_to_clipboard(order_row['Phone'])
+
+    col_addr, col_copy_addr = st.columns([8, 1])
+    with col_addr:
+        st.write(f"**Address:** {order_row['Address']}")
+    with col_copy_addr:
+        if st.button("Copy", key="copy_address"):
+            copy_to_clipboard(order_row['Address'])
 
     # SF Delivery Number input
-    sf_input = st.text_input("Enter SF Delivery Number", key="sf_input", value="")
+    sf_input = st.text_input("Enter SF Delivery Number", key="sf_input", value=st.session_state.get('sf_input', ""))
     if 'show_submit' not in st.session_state:
         st.session_state['show_submit'] = True
     if st.session_state['show_submit'] and st.button("Submit"):
@@ -317,19 +288,24 @@ def order_details_page():
         if 'message_lang' not in st.session_state:
             st.session_state['message_lang'] = 'default'
 
+        col_msg, col_copy_msg = st.columns([8, 1])
         if has_chinese and st.session_state['message_lang'] in ['default', 'zh']:
             message = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持🫡"
-            st.text_area("", value=message, height=100, disabled=True, key="message_chinese")
-            if st.button("Copy", key="copy_message_chinese"):
-                copy_to_clipboard(message)
+            with col_msg:
+                st.write(f"**Message:** {message}")
+            with col_copy_msg:
+                if st.button("Copy", key="copy_message_chinese"):
+                    copy_to_clipboard(message)
             if st.button("English"):
                 st.session_state['message_lang'] = 'en'
                 st.rerun()
         else:
             message = f"SF Delivery Number: {st.session_state['sf_delivery']}\nHello shoes are sent. Please leave a 5 star review when receiving the product. Have a nice day."
-            st.text_area("", value=message, height=100, disabled=True, key="message_english")
-            if st.button("Copy", key="copy_message_english"):
-                copy_to_clipboard(message)
+            with col_msg:
+                st.write(f"**Message:** {message}")
+            with col_copy_msg:
+                if st.button("Copy", key="copy_message_english"):
+                    copy_to_clipboard(message)
             if st.button("中文"):
                 st.session_state['message_lang'] = 'zh'
                 st.rerun()
@@ -346,6 +322,10 @@ def order_details_page():
 # Order Completed page
 def order_completed_page():
     st.title("Order Completed")
+    def go_home():
+        st.session_state['page'] = 'Home'
+        reset_page_state('Home')
+    st.button("Home", key="home_button_completed", on_click=go_home)
     if 'selected_order' not in st.session_state:
         st.error("No order selected.")
         return
@@ -369,8 +349,11 @@ def order_completed_page():
     st.write(f"SF Delivery Number: {order_row['SF Delivery Number']}")
 
 # Main App
-if 'auth_state' not in st.session_state or st.session_state['auth_state'] != 'authenticated':
-    google_login()
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
+
+if not st.session_state['logged_in']:
+    login_page()
 else:
     if 'page' not in st.session_state:
         st.session_state['page'] = 'Home'
@@ -378,10 +361,10 @@ else:
     if st.session_state['page'] == 'Home':
         home_page()
     elif st.session_state['page'] == 'Book Keeping':
-        reset_page_state('Book Keeping')  # Reset state on entry
         st.title("Transaction Record")
         def go_home():
             st.session_state['page'] = 'Home'
+            reset_page_state('Home')
         st.button("Home", key="home_button", on_click=go_home)
         st.write("")
         st.write("")
@@ -418,12 +401,14 @@ else:
                 del st.session_state['success']
                 st.session_state['show_button'] = True
                 st.session_state['template_text'] = ""
+                reset_page_state('Book Keeping')
                 st.rerun()
         elif 'error' in st.session_state:
             st.error(f"Failed to add entry: {st.session_state['error']}")
             if st.button("Home"):
                 st.session_state['page'] = 'Home'
                 del st.session_state['error']
+                reset_page_state('Home')
                 st.rerun()
 
     elif st.session_state['page'] == 'Pending Orders':
@@ -439,6 +424,7 @@ else:
         with col2:
             def go_home_record():
                 st.session_state['page'] = 'Home'
+                reset_page_state('Home')
             st.button("Home", key="home_button_record", on_click=go_home_record)
         st.markdown("""
         <style>
@@ -448,9 +434,10 @@ else:
         </style>
         """, unsafe_allow_html=True)
         st.header("Record Checking")
-        query = st.text_input("Enter search terms (e.g., date, shoe model, name)")
+        query = st.text_input("Enter search terms (e.g., date, shoe model, name)", value=st.session_state.get('search_query', ""))
         if st.button("Search"):
             if query:
+                st.session_state['search_query'] = query
                 results = search_sheet(query)
                 if not results.empty:
                     st.dataframe(results, use_container_width=True)
@@ -466,6 +453,7 @@ else:
         with col2:
             def go_home_quick():
                 st.session_state['page'] = 'Home'
+                reset_page_state('Home')
             st.button("Home", key="home_button_quick", on_click=go_home_quick)
         st.markdown("""
         <style>
@@ -476,6 +464,9 @@ else:
         """, unsafe_allow_html=True)
         st.header("Quick Responses")
         for response in quick_responses:
-            st.write(response)
-            if st.button("Copy", key=f"copy_response_{response}"):
-                copy_to_clipboard(response)
+            col_resp, col_copy = st.columns([8, 1])
+            with col_resp:
+                st.write(response)
+            with col_copy:
+                if st.button("Copy", key=f"copy_response_{response}"):
+                    copy_to_clipboard(response)
