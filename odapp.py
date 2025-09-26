@@ -264,7 +264,6 @@ def pending_orders_page():
         reset_page_state(st.session_state['page'])
         st.rerun()
 
-
 # Order Details page
 def order_details_page():
     col1, col2 = st.columns([8, 1])
@@ -306,7 +305,7 @@ def order_details_page():
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="item-container"><p class="item-label">Item, Color, Size:</p>', unsafe_allow_html=True)
-    st.text_area("", value=f"{order_row['Item']} (Color: {order_row['Color']}, Size: {row['Size']})", height=50, disabled=True, key=f"item_box_{st.session_state['selected_order']}")
+    st.text_area("", value=f"{order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})", height=50, disabled=True, key=f"item_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="item-container"><p class="item-label">Name:</p>', unsafe_allow_html=True)
@@ -317,7 +316,7 @@ def order_details_page():
     st.text_area("", value=str(order_row['Phone']) if not pd.isna(order_row['Phone']) else "", height=50, disabled=True, key=f"phone_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
 
- loro  st.markdown('<div class="item-container"><p class="item-label">Address:</p>', unsafe_allow_html=True)
+    st.markdown('<div class="item-container"><p class="item-label">Address:</p>', unsafe_allow_html=True)
     st.text_area("", value=str(order_row['Address']) if not pd.isna(order_row['Address']) else "", height=100, disabled=True, key=f"address_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -562,4 +561,3 @@ else:
             st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
             reset_page_state(st.session_state['page'])
             st.rerun()
-
