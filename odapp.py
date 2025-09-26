@@ -7,6 +7,7 @@ import os
 import re  # For extracting data from template
 from datetime import datetime
 from builtins import max
+from st_clipboard import copy_to_clipboard  # New import for reliable clipboard copying
 
 # Google Sheets config with environment variable support
 @st.cache_resource
@@ -125,7 +126,7 @@ def update_order_status(order_num, status):
     if not df.empty and 'Order' in df.columns:
         row_idx = df.index[df['Order'] == order_num].tolist()
         if row_idx:
-            sheet.update_cell(row_idx[0] + 2, df.columns.get_loc('Status') + 1, status)  # Updates dropdown if status is a valid option
+            sheet.update_cell(row_idx[0] + 2, df.columns.get_loc('Status') + 1, status)
             return True
     return False
 
@@ -158,7 +159,13 @@ def pending_orders_page():
     st.title("Pending Orders")
     def go_home():
         st.session_state['page'] = 'Home'
-    st.button("Home", key="home_button_pending", on_click=go_home)
+    def refresh():
+        st.rerun()
+    # Place Home and Refresh buttons vertically aligned
+    col1 = st.columns(1)[0]  # Single column for vertical alignment
+    with col1:
+        st.button("Home", key="home_button_pending", on_click=go_home)
+        st.button("Refresh", key="refresh_button_pending", on_click=refresh)
     st.markdown("""
     <style>
     .stTextInput, .stTextArea { width: 100% !important; }
@@ -217,13 +224,16 @@ def order_details_page():
     st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})")
     st.write(f"**Name:**")
     st.text_area("", value=order_row['Name'], height=50, disabled=True, key="name_box")
-    st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{order_row['Name']}')\">Copy</button>", unsafe_allow_html=True)
+    if st.button("Copy Name"):
+        copy_to_clipboard(order_row['Name'])
     st.write(f"**Phone:**")
     st.text_area("", value=order_row['Phone'], height=50, disabled=True, key="phone_box")
-    st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{order_row['Phone']}')\">Copy</button>", unsafe_allow_html=True)
+    if st.button("Copy Phone"):
+        copy_to_clipboard(order_row['Phone'])
     st.write(f"**Address:**")
     st.text_area("", value=order_row['Address'], height=100, disabled=True, key="address_box")
-    st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{order_row['Address']}')\">Copy</button>", unsafe_allow_html=True)
+    if st.button("Copy Address"):
+        copy_to_clipboard(order_row['Address'])
 
     # SF Delivery Number input
     sf_input = st.text_input("Enter SF Delivery Number", key="sf_input")
@@ -253,14 +263,16 @@ def order_details_page():
         if has_chinese and st.session_state['message_lang'] in ['default', 'zh']:
             message = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持🫡"
             st.text_area("", value=message, height=100, disabled=True, key="message_chinese")
-            st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{message}')\">Copy</button>", unsafe_allow_html=True)
+            if st.button("Copy Message"):
+                copy_to_clipboard(message)
             if st.button("English"):
                 st.session_state['message_lang'] = 'en'
                 st.rerun()
         else:
             message = f"SF Delivery Number: {st.session_state['sf_delivery']}\nHello shoes are sent. Please leave a 5 star review when receiving the product. Have a nice day."
             st.text_area("", value=message, height=100, disabled=True, key="message_english")
-            st.markdown(f"<button onclick=\"navigator.clipboard.writeText('{message}')\">Copy</button>", unsafe_allow_html=True)
+            if st.button("Copy Message"):
+                copy_to_clipboard(message)
             if st.button("中文"):
                 st.session_state['message_lang'] = 'zh'
                 st.rerun()
