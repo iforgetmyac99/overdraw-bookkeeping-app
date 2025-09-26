@@ -342,22 +342,24 @@ def order_details_page():
     # Success banner and message
     if 'success' in st.session_state:
         st.success("SF Delivery Number updated successfully!", icon="✅")
-        row_text = ' '.join(str(order_row[col]) if not pd.isna(order_row[col]) else '' for col in order_row.index)
-        has_chinese = bool(re.search(r'[\u4e00-\u9fff]', row_text))
         if 'message_lang' not in st.session_state:
-            st.session_state['message_lang'] = 'default'
+            st.session_state['message_lang'] = 'en'  # Default to English
 
         st.markdown('<div class="item-container"><p class="item-label">Delivery Message:</p>', unsafe_allow_html=True)
-        if has_chinese and st.session_state['message_lang'] in ['default', 'zh']:
+        if st.session_state['message_lang'] == 'zh':
             message = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持🫡"
             st.text_area("", value=message, height=100, disabled=True, key="message_chinese")
-            if st.button("English"):
-                st.session_state['message_lang'] = 'en'
-                st.rerun()
         else:
             message = f"SF Delivery Number: {st.session_state['sf_delivery']}\nHello shoes are sent. Please leave a 5 star review when receiving the product. Have a nice day."
             st.text_area("", value=message, height=100, disabled=True, key="message_english")
-            if st.button("中文"):
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("English", key="english_button"):
+                st.session_state['message_lang'] = 'en'
+                st.rerun()
+        with col2:
+            if st.button("中文", key="chinese_button"):
                 st.session_state['message_lang'] = 'zh'
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
