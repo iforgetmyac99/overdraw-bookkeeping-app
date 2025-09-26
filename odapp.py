@@ -40,14 +40,22 @@ def go_home():
 
 # Login Implementation
 def login_page():
-    st.title("OverDraw Management Portal")
     st.markdown("""
     <style>
     .login-form { max-width: 400px; margin: 0 auto; }
     .login-form input { width: 100% !important; }
     .login-form button { background-color: #4CAF50; color: white; padding: 10px; width: 100%; }
+    .login-title { 
+        font-size: 2em; /* Reduced font size for iPhone 15 Pro */
+        max-width: 400px; 
+        margin: 0 auto; 
+        text-align: left; /* Align with login box */
+        padding-bottom: 20px; 
+    }
     </style>
     """, unsafe_allow_html=True)
+    
+    st.markdown('<h1 class="login-title">OverDraw Management Portal</h1>', unsafe_allow_html=True)
     
     with st.form("login_form", clear_on_submit=True):
         username = st.text_input("Account")
@@ -455,7 +463,7 @@ def order_details_page():
 
     # SF Delivery Number input
     st.markdown('<div class="item-container"><p class="item-label">Enter SF Delivery Number:</p>', unsafe_allow_html=True)
-    sf_input = st.text_input("", key="sf_input", value=st.session_state.get('sf_input', ""))
+    st.text_input("", key="sf_input", value=st.session_state.get('sf_input', ""))
     st.markdown('</div>', unsafe_allow_html=True)
 
     if 'show_submit' not in st.session_state:
