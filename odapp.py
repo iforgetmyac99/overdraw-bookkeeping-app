@@ -2,11 +2,14 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
+from io import BytesIO
 import os
 import re
 from datetime import datetime
 from builtins import max
 from st_clipboard import copy_to_clipboard  # For reliable clipboard copying
+import requests
+from urllib.parse import urlencode
 
 # Google Sheets config with environment variable support
 @st.cache_resource
@@ -25,48 +28,77 @@ def reset_page_state(page):
     if page == 'Book Keeping':
         st.session_state['template_text'] = ""  # Clear template text input
     elif page == 'Order Details':
-        if 'sf_input' not in st.session_state:
-            st.session_state['sf_input'] = ""  # Preserve sf_input unless explicitly cleared
+        st.session_state['sf_input'] = ""  # Clear SF delivery input
 
-# Simple Username/Password Login
-def simple_login():
+# Google OAuth2 Login
+def google_login():
+    st.title("OverDraw Management Portal")
     st.markdown("""
     <style>
-    .main-header { text-align: center; margin-bottom: 2rem; }
-    .login-container { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .login-button { margin-top: 1rem; }
+    .login-button { display: flex; justify-content: center; }
     .login-button button { background-color: #4285F4; color: white; padding: 10px 20px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; }
     .login-button button:hover { background-color: #357ae8; }
-    .stTextInput { width: 300px !important; }
     </style>
     """, unsafe_allow_html=True)
-
-    st.markdown('<div class="main-header"><h1>OverDraw Management Portal</h1></div>', unsafe_allow_html=True)
 
     if 'auth_state' not in st.session_state:
         st.session_state['auth_state'] = 'not_authenticated'
 
+    # Google OAuth2 configuration
+    client_id = st.secrets["google_oauth"]["client_id"]
+    redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
+    auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
+        'client_id': client_id,
+        'redirect_uri': redirect_uri,
+        'response_type': 'code',
+        'scope': 'email profile',
+        'access_type': 'offline',
+        'prompt': 'consent'
+    })
+
+    # Display Login button
     if st.session_state['auth_state'] == 'not_authenticated':
-        with st.form("login_form"):
-            st.markdown('<div class="login-container">', unsafe_allow_html=True)
-            username = st.text_input("Username", placeholder="Enter username")
-            password = st.text_input("Password", type="password", placeholder="Enter password")
-            submit = st.form_submit_button("Login", use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            if submit:
-                try:
-                    if username == st.secrets["login"]["username"] and password == st.secrets["login"]["password"]:
-                        st.session_state['auth_state'] = 'authenticated'
-                        st.session_state['page'] = 'Home'
-                        st.rerun()
-                    else:
-                        st.error("Invalid username or password.")
-                except KeyError:
-                    st.error("Login credentials not found in secrets. Please configure secrets.toml.")
-                    st.stop()
-
+        st.markdown(f'<div class="login-button"><a href="{auth_url}"><button>Login with Google</button></a></div>', unsafe_allow_html=True)
         st.stop()
+
+    # Handle OAuth callback
+    query_params = st.experimental_get_query_params()
+    if 'code' in query_params:
+        code = query_params['code'][0]
+        # Exchange code for access token
+        token_url = "https://oauth2.googleapis.com/token"
+        token_data = {
+            'code': code,
+            'client_id': client_id,
+            'client_secret': st.secrets["google_oauth"]["client_secret"],
+            'redirect_uri': redirect_uri,
+            'grant_type': 'authorization_code'
+        }
+        response = requests.post(token_url, data=token_data)
+        token_json = response.json()
+
+        if 'access_token' in token_json:
+            # Get user info
+            user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+            headers = {'Authorization': f"Bearer {token_json['access_token']}"}
+            user_info = requests.get(user_info_url, headers=headers).json()
+
+            # Check if the email is allowed
+            allowed_email = "ryantlyu1018@gmail.com"
+            if user_info.get('email') == allowed_email:
+                st.session_state['auth_state'] = 'authenticated'
+                st.session_state['user_email'] = user_info['email']
+                st.session_state['page'] = 'Home'
+                st.experimental_set_query_params()  # Clear query params
+                st.rerun()
+            else:
+                st.error("Access denied: Only ryantlyu1018@gmail.com is authorized.")
+                st.session_state['auth_state'] = 'not_authenticated'
+                st.stop()
+        else:
+            st.error("Authentication failed. Please try again.")
+            st.session_state['auth_state'] = 'not_authenticated'
+            st.stop()
 
 # Extract data from Carousell template
 def extract_data(template_text):
@@ -138,35 +170,27 @@ def search_sheet(query):
 
 # Update SF Delivery Number
 def update_sf_delivery(order_num, sf_delivery_number):
-    try:
-        sheet = load_gspread()
-        data = sheet.get_all_records()
-        df = pd.DataFrame(data)
-        if not df.empty and 'Order' in df.columns:
-            row_idx = df.index[df['Order'] == order_num].tolist()
-            if row_idx:
-                sheet.update_cell(row_idx[0] + 2, df.columns.get_loc('SF Delivery Number') + 1, sf_delivery_number)
-                return True
-        return False
-    except Exception as e:
-        st.error(f"Error updating SF Delivery Number: {str(e)}")
-        return False
+    sheet = load_gspread()
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data)
+    if not df.empty and 'Order' in df.columns:
+        row_idx = df.index[df['Order'] == order_num].tolist()
+        if row_idx:
+            sheet.update_cell(row_idx[0] + 2, df.columns.get_loc('SF Delivery Number') + 1, sf_delivery_number)
+            return True
+    return False
 
 # Update Order Status
 def update_order_status(order_num, status):
-    try:
-        sheet = load_gspread()
-        data = sheet.get_all_records()
-        df = pd.DataFrame(data)
-        if not df.empty and 'Order' in df.columns:
-            row_idx = df.index[df['Order'] == order_num].tolist()
-            if row_idx:
-                sheet.update_cell(row_idx[0] + 2, df.columns.get_loc('Status') + 1, status)
-                return True
-        return False
-    except Exception as e:
-        st.error(f"Error updating order status: {str(e)}")
-        return False
+    sheet = load_gspread()
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data)
+    if not df.empty and 'Order' in df.columns:
+        row_idx = df.index[df['Order'] == order_num].tolist()
+        if row_idx:
+            sheet.update_cell(row_idx[0] + 2, df.columns.get_loc('Status') + 1, status)
+            return True
+    return False
 
 # Quick Responses
 quick_responses = [
@@ -193,17 +217,13 @@ def pending_orders_page():
     st.title("Pending Orders")
     def go_home():
         st.session_state['page'] = 'Home'
-
+    def refresh():
+        st.cache_data.clear()  # Clear cache for fresh data
+        st.rerun()
     col1 = st.columns(1)[0]
     with col1:
         st.button("Home", key="home_button_pending", on_click=go_home)
-        # Use form for refresh to avoid callback rerun issue
-        with st.form("refresh_form"):
-            refresh = st.form_submit_button("Refresh")
-            if refresh:
-                st.cache_data.clear()  # Clear cache for fresh data
-                st.rerun()
-
+        st.button("Refresh", key="refresh_button_pending", on_click=refresh)
     st.markdown("""
     <style>
     .stTextInput, .stTextArea { width: 100% !important; }
@@ -236,12 +256,10 @@ def order_details_page():
     def go_pending_orders():
         st.session_state['page'] = 'Pending Orders'
         reset_page_state('Pending Orders')
-
     col1 = st.columns(1)[0]
     with col1:
         st.button("Return", key="return_button", on_click=go_pending_orders)
         st.button("Home", key="home_button_details", on_click=go_home)
-
     st.markdown("""
     <style>
     .stTextInput, .stTextArea { width: 100% !important; }
@@ -261,7 +279,7 @@ def order_details_page():
 
     # Display order details with copy buttons (Task 5: Unified "Copy" label)
     st.write(f"**Order Number:** {order_row['Order']}")
-    st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})")
+    st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {row['Color']}, Size: {row['Size']})")
     st.write(f"**Name:**")
     st.text_area("", value=order_row['Name'], height=50, disabled=True, key="name_box")
     if st.button("Copy", key="copy_name"):
@@ -275,23 +293,21 @@ def order_details_page():
     if st.button("Copy", key="copy_address"):
         copy_to_clipboard(order_row['Address'])
 
-    # SF Delivery Number input with form to persist input
-    with st.form("sf_delivery_form"):
-        sf_input = st.text_input("Enter SF Delivery Number", key="sf_input", value=st.session_state.get('sf_input', ''))
-        submit = st.form_submit_button("Submit")
-
-        if submit:
-            if sf_input.strip():  # Ensure non-empty after trimming whitespace
-                st.session_state['sf_input'] = sf_input  # Persist input
-                if update_sf_delivery(st.session_state['selected_order'], sf_input):
-                    st.session_state['success'] = True
-                    st.session_state['show_submit'] = False
-                    st.session_state['sf_delivery'] = sf_input
-                    st.rerun()
-                else:
-                    st.error("Failed to update SF Delivery Number. Check Google Sheets permissions or order number.")
+    # SF Delivery Number input
+    sf_input = st.text_input("Enter SF Delivery Number", key="sf_input", value="")
+    if 'show_submit' not in st.session_state:
+        st.session_state['show_submit'] = True
+    if st.session_state['show_submit'] and st.button("Submit"):
+        if sf_input:
+            if update_sf_delivery(st.session_state['selected_order'], sf_input):
+                st.session_state['success'] = True
+                st.session_state['show_submit'] = False
+                st.session_state['sf_delivery'] = sf_input
+                st.rerun()
             else:
-                st.error("Please enter a valid SF Delivery Number.")
+                st.error("Failed to update SF Delivery Number.")
+        else:
+            st.error("Please enter a delivery number.")
 
     # Success banner and message
     if 'success' in st.session_state:
@@ -354,7 +370,7 @@ def order_completed_page():
 
 # Main App
 if 'auth_state' not in st.session_state or st.session_state['auth_state'] != 'authenticated':
-    simple_login()
+    google_login()
 else:
     if 'page' not in st.session_state:
         st.session_state['page'] = 'Home'
