@@ -15,23 +15,22 @@ def load_gspread():
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
     return gspread.authorize(creds).open_by_key('10CLEJyH7LGkZrVjc8EiicJ2PCBY_se7gALChd_YyaCg').sheet1
 
-# State reset function for Task 6
+# State reset function
 def reset_page_state(page):
     """Reset session state variables for a fresh page load."""
-    state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang', 'template_text', 'sf_input', 'search_query']
+    state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang', 'template_text', 'sf_input', 'search_query', 'refresh_trigger']
     for key in state_keys:
         if key in st.session_state:
             del st.session_state[key]
     if page == 'Book Keeping':
-        if 'template_text' in st.session_state:
-            del st.session_state['template_text']  # Clear widget state safely
+        st.session_state['template_text'] = ""  # Ensure text box is empty
     elif page == 'Order Details':
         st.session_state['sf_input'] = ""  # Clear SF delivery input
     elif page == 'Record Checking':
         st.session_state['search_query'] = ""  # Clear search input
     st.session_state['last_page'] = page  # Track current page
 
-# Login Implementation (Task 7, Issue 1: 10-min timeout)
+# Login Implementation
 def login_page():
     st.title("OverDraw Management Portal")
     st.markdown("""
@@ -52,7 +51,7 @@ def login_page():
                 st.session_state['last_activity'] = time.time()
                 if 'page' not in st.session_state:
                     st.session_state['page'] = 'Home'
-                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
+                st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
                 reset_page_state(st.session_state['page'])
                 st.rerun()
             else:
@@ -161,13 +160,12 @@ quick_responses = [
     "Sorry, item out of stock."
 ]
 
-# Callback for clearing input in Book Keeping
+# Callback for clearing input in Book Keeping (Issue 1)
 def clear_template_input():
     if 'success' in st.session_state:
         del st.session_state['success']
     st.session_state['show_button'] = True
-    if 'template_text' in st.session_state:
-        del st.session_state['template_text']
+    st.session_state['template_text'] = ""  # Clear text box for next entry
 
 # Home page
 def home_page():
@@ -178,28 +176,28 @@ def home_page():
         st.button("Home", disabled=True, key="home_button_home")
     if st.button("Book Keeping"):
         st.session_state['page'] = 'Book Keeping'
-        st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Book Keeping')
         st.rerun()
     if st.button("Pending Orders"):
         st.session_state['page'] = 'Pending Orders'
-        st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Pending Orders')
         st.rerun()
     if st.button("Record Checking"):
         st.session_state['page'] = 'Record Checking'
-        st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Record Checking')
         st.rerun()
     if st.button("Quick Responses"):
         st.session_state['page'] = 'Quick Responses'
-        st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Quick Responses')
         st.rerun()
 
-# Pending Orders page
+# Pending Orders page (Issue 3)
 @st.cache_data
-def get_pending_df():
+def get_pending_df(_refresh_trigger):
     sheet = load_gspread()
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
@@ -211,15 +209,16 @@ def pending_orders_page():
     with col1:
         st.title("Pending Orders")
     with col2:
-        def go_home():
-            st.session_state['page'] = 'Home'
-            st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
-            reset_page_state('Home')
-        st.button("Home", key="home_button_pending", on_click=go_home)
-    def refresh():
-        get_pending_df.clear()  # Clear specific cache to fetch fresh data
-        st.rerun()
-    st.button("Refresh", key="refresh_button_pending", on_click=refresh)
+        st.button("Home", key="home_button_pending", on_click=lambda: st.session_state.update({'page': 'Home', 'refresh_trigger': time.time()}))
+    
+    if 'refresh_trigger' not in st.session_state:
+        st.session_state['refresh_trigger'] = time.time()
+    
+    if st.button("Refresh", key="refresh_button_pending"):
+        st.session_state['refresh_trigger'] = time.time()
+    
+    pending_df = get_pending_df(st.session_state['refresh_trigger'])
+
     st.markdown("""
     <style>
     .stTextInput, .stTextArea { width: 100% !important; }
@@ -236,18 +235,22 @@ def pending_orders_page():
     </script>
     """, unsafe_allow_html=True)
 
-    pending_df = get_pending_df()
-
     if not pending_df.empty:
         for index, row in pending_df.iterrows():
             if st.button(f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})", key=f"order_{row['Order']}"):
                 st.session_state['selected_order'] = row['Order']
                 st.session_state['page'] = 'Order Details'
-                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
+                st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
                 reset_page_state('Order Details')
                 st.rerun()
     else:
         st.write("No pending orders found.")
+
+    # Handle navigation after button clicks
+    if st.session_state.get('page') != 'Pending Orders':
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state(st.session_state['page'])
+        st.rerun()
 
 # Order Details page
 def order_details_page():
@@ -255,22 +258,16 @@ def order_details_page():
     with col1:
         st.title("Order Details")
     with col2:
-        def go_home():
-            st.session_state['page'] = 'Home'
-            st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
-            reset_page_state('Home')
-        st.button("Home", key="home_button_details", on_click=go_home)
-    def go_pending_orders():
-        st.session_state['page'] = 'Pending Orders'
-        st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
-        reset_page_state('Pending Orders')
-    st.button("Return", key="return_button", on_click=go_pending_orders)
+        st.button("Home", key="home_button_details", on_click=lambda: st.session_state.update({'page': 'Home', 'refresh_trigger': time.time()}))
+    st.button("Return", key="return_button", on_click=lambda: st.session_state.update({'page': 'Pending Orders', 'refresh_trigger': time.time()}))
     st.markdown("""
     <style>
     .stTextInput, .stTextArea { width: 100% !important; }
     .stDataFrame { width: 100%; overflow-x: auto; }
     .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
     .stTextArea textarea { user-select: all; }
+    .item-label { margin-bottom: 0px; font-weight: bold; }
+    .item-container { margin-bottom: 20px; }
     </style>
     <script>
     document.querySelectorAll('textarea').forEach(textarea => {
@@ -290,18 +287,32 @@ def order_details_page():
     df = pd.DataFrame(data)
     order_row = df[df['Order'] == st.session_state['selected_order']].iloc[0]
 
-    # Display order details in text areas without copy buttons (Issue 1)
-    st.write(f"**Order Number:** {order_row['Order']}")
-    st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})")
-    st.write(f"**Name:**")
+    # Display order details with improved formatting
+    st.markdown('<div class="item-container"><p class="item-label">Order Number:</p>', unsafe_allow_html=True)
+    st.text_area("", value=str(order_row['Order']) if not pd.isna(order_row['Order']) else "", height=50, disabled=True, key=f"order_box_{st.session_state['selected_order']}")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="item-container"><p class="item-label">Item, Color, Size:</p>', unsafe_allow_html=True)
+    st.text_area("", value=f"{order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})", height=50, disabled=True, key=f"item_box_{st.session_state['selected_order']}")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="item-container"><p class="item-label">Name:</p>', unsafe_allow_html=True)
     st.text_area("", value=str(order_row['Name']) if not pd.isna(order_row['Name']) else "", height=50, disabled=True, key=f"name_box_{st.session_state['selected_order']}")
-    st.write(f"**Phone:**")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="item-container"><p class="item-label">Phone:</p>', unsafe_allow_html=True)
     st.text_area("", value=str(order_row['Phone']) if not pd.isna(order_row['Phone']) else "", height=50, disabled=True, key=f"phone_box_{st.session_state['selected_order']}")
-    st.write(f"**Address:**")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="item-container"><p class="item-label">Address:</p>', unsafe_allow_html=True)
     st.text_area("", value=str(order_row['Address']) if not pd.isna(order_row['Address']) else "", height=100, disabled=True, key=f"address_box_{st.session_state['selected_order']}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # SF Delivery Number input
-    sf_input = st.text_input("Enter SF Delivery Number", key="sf_input", value=st.session_state.get('sf_input', ""))
+    st.markdown('<div class="item-container"><p class="item-label">Enter SF Delivery Number:</p>', unsafe_allow_html=True)
+    sf_input = st.text_input("", key="sf_input", value=st.session_state.get('sf_input', ""))
+    st.markdown('</div>', unsafe_allow_html=True)
+
     if 'show_submit' not in st.session_state:
         st.session_state['show_submit'] = True
     if st.session_state['show_submit'] and st.button("Submit"):
@@ -316,7 +327,7 @@ def order_details_page():
         else:
             st.error("Please enter a delivery number.")
 
-    # Success banner and message in text area (Issue 1)
+    # Success banner and message
     if 'success' in st.session_state:
         st.success("SF Delivery Number updated successfully!", icon="✅")
         row_text = ' '.join(str(order_row[col]) if not pd.isna(order_row[col]) else '' for col in order_row.index)
@@ -324,7 +335,7 @@ def order_details_page():
         if 'message_lang' not in st.session_state:
             st.session_state['message_lang'] = 'default'
 
-        st.write("**Delivery Message:**")
+        st.markdown('<div class="item-container"><p class="item-label">Delivery Message:</p>', unsafe_allow_html=True)
         if has_chinese and st.session_state['message_lang'] in ['default', 'zh']:
             message = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持🫡"
             st.text_area("", value=message, height=100, disabled=True, key="message_chinese")
@@ -337,16 +348,23 @@ def order_details_page():
             if st.button("中文"):
                 st.session_state['message_lang'] = 'zh'
                 st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
         if st.button("Finish"):
             if update_order_status(st.session_state['selected_order'], "Delivered"):
                 st.session_state['success'] = False
                 st.session_state['page'] = 'Pending Orders'
-                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
+                st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
                 reset_page_state('Pending Orders')
                 st.rerun()
             else:
                 st.error("Failed to update order status.")
+
+    # Handle navigation after button clicks
+    if st.session_state.get('page') != 'Order Details':
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state(st.session_state['page'])
+        st.rerun()
 
 # Order Completed page
 def order_completed_page():
@@ -354,11 +372,7 @@ def order_completed_page():
     with col1:
         st.title("Order Completed")
     with col2:
-        def go_home():
-            st.session_state['page'] = 'Home'
-            st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
-            reset_page_state('Home')
-        st.button("Home", key="home_button_completed", on_click=go_home)
+        st.button("Home", key="home_button_completed", on_click=lambda: st.session_state.update({'page': 'Home', 'refresh_trigger': time.time()}))
     if 'selected_order' not in st.session_state:
         st.error("No order selected.")
         return
@@ -381,12 +395,18 @@ def order_completed_page():
     st.write(f"Address: {order_row['Address']}")
     st.write(f"SF Delivery Number: {order_row['SF Delivery Number']}")
 
+    # Handle navigation
+    if st.session_state.get('page') != 'Order Completed':
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state(st.session_state['page'])
+        st.rerun()
+
 # Main App
-query_params = st.experimental_get_query_params()
-if 'logged_in' in query_params and query_params['logged_in'][0] == 'true':
+query_params = st.query_params.to_dict()
+if 'logged_in' in query_params and query_params['logged_in'] == 'true' and 'page' in query_params:
     st.session_state['logged_in'] = True
-    if 'page' in query_params:
-        st.session_state['page'] = query_params['page'][0]
+    st.session_state['page'] = query_params['page']
+    st.session_state['last_activity'] = time.time()  # Reset activity timer on refresh
 
 if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
     login_page()
@@ -399,14 +419,14 @@ else:
         del st.session_state['logged_in']
         if 'page' in st.session_state:
             del st.session_state['page']
-        st.experimental_set_query_params()
+        st.query_params.clear()
         reset_page_state('Login')
         st.rerun()
     st.session_state['last_activity'] = current_time
 
     if 'page' not in st.session_state:
         st.session_state['page'] = 'Home'
-        st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
 
     if st.session_state['page'] == 'Home':
         home_page()
@@ -415,11 +435,7 @@ else:
         with col1:
             st.title("Transaction Record")
         with col2:
-            def go_home():
-                st.session_state['page'] = 'Home'
-                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
-                reset_page_state('Home')
-            st.button("Home", key="home_button", on_click=go_home)
+            st.button("Home", key="home_button", on_click=lambda: st.session_state.update({'page': 'Home', 'refresh_trigger': time.time()}))
         st.markdown("""
         <style>
         .stTextInput, .stTextArea { width: 100% !important; }
@@ -436,7 +452,7 @@ else:
         </script>
         """, unsafe_allow_html=True)
         st.markdown('<h3 style="font-size: 1.4em;">Paste transaction here.</h3>', unsafe_allow_html=True)
-        template_text = st.text_area("", height=200, key="template_text")
+        template_text = st.text_area("", value=st.session_state.get('template_text', ""), height=200, key="template_text")
         if 'show_button' not in st.session_state:
             st.session_state['show_button'] = True
         if st.session_state['show_button'] and st.button("Process and Add"):
@@ -447,6 +463,7 @@ else:
                     if result is True:
                         st.session_state['success'] = True
                         st.session_state['show_button'] = False
+                        st.session_state['template_text'] = ""  # Clear text box
                     else:
                         st.session_state['error'] = result
                     st.rerun()
@@ -463,7 +480,7 @@ else:
             if st.button("Home"):
                 st.session_state['page'] = 'Home'
                 del st.session_state['error']
-                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
+                st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
                 reset_page_state('Home')
                 st.rerun()
 
@@ -478,11 +495,7 @@ else:
         with col1:
             st.title("Transaction Record")
         with col2:
-            def go_home_record():
-                st.session_state['page'] = 'Home'
-                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
-                reset_page_state('Home')
-            st.button("Home", key="home_button_record", on_click=go_home_record)
+            st.button("Home", key="home_button_record", on_click=lambda: st.session_state.update({'page': 'Home', 'refresh_trigger': time.time()}))
         st.markdown("""
         <style>
         .stTextInput, .stTextArea { width: 100% !important; }
@@ -493,7 +506,7 @@ else:
         <script>
         document.querySelectorAll('textarea').forEach(textarea => {
             textarea.addEventListener('dblclick', function() {
-                this.select();
+            this.select();
             });
         });
         </script>
@@ -511,16 +524,18 @@ else:
             else:
                 st.error("Enter search terms.")
 
+        # Handle navigation
+        if st.session_state.get('page') != 'Record Checking':
+            st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+            reset_page_state(st.session_state['page'])
+            st.rerun()
+
     elif st.session_state['page'] == 'Quick Responses':
         col1, col2 = st.columns([8, 1])
         with col1:
             st.title("Transaction Record")
         with col2:
-            def go_home_quick():
-                st.session_state['page'] = 'Home'
-                st.experimental_set_query_params(logged_in='true', page=st.session_state['page'])
-                reset_page_state('Home')
-            st.button("Home", key="home_button_quick", on_click=go_home_quick)
+            st.button("Home", key="home_button_quick", on_click=lambda: st.session_state.update({'page': 'Home', 'refresh_trigger': time.time()}))
         st.markdown("""
         <style>
         .stTextInput, .stTextArea { width: 100% !important; }
@@ -531,3 +546,9 @@ else:
         st.header("Quick Responses")
         for response in quick_responses:
             st.write(response)
+
+        # Handle navigation
+        if st.session_state.get('page') != 'Quick Responses':
+            st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+            reset_page_state(st.session_state['page'])
+            st.rerun()
