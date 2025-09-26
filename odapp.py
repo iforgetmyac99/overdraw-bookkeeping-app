@@ -29,7 +29,7 @@ def reset_page_state(page):
     elif page == 'Record Checking':
         st.session_state['search_query'] = ""  # Clear search input
     elif page == 'Quick Responses':
-        st.session_state['quick_response_lang'] = 'en'  # Default to English
+        st.session_state['quick_response_lang'] = None  # No messages on page load
     st.session_state['last_page'] = page  # Track current page
 
 # Navigation helper
@@ -175,6 +175,7 @@ def quick_responses_page():
     .stTextArea textarea { user-select: all; }
     .item-label { margin-bottom: 0px; font-weight: bold; }
     .item-container { margin-bottom: 20px; }
+    .button-container { display: flex; gap: 5px; justify-content: flex-start; margin-bottom: 20px; }
     </style>
     <script>
     document.querySelectorAll('textarea').forEach(textarea => {
@@ -187,30 +188,29 @@ def quick_responses_page():
 
     # Language toggle buttons
     if 'quick_response_lang' not in st.session_state:
-        st.session_state['quick_response_lang'] = 'en'  # Default to English
+        st.session_state['quick_response_lang'] = None  # No messages on page load
     
-    col1, col2 = st.columns(2)
+    st.markdown('<div class="button-container">', unsafe_allow_html=True)
+    col1, col2 = st.columns([1, 1])
     with col1:
-        if st.button("English", key="quick_english_button"):
-            st.session_state['quick_response_lang'] = 'en'
-            st.rerun()
-    with col2:
         if st.button("中文", key="quick_chinese_button"):
             st.session_state['quick_response_lang'] = 'zh'
             st.rerun()
+    with col2:
+        if st.button("English", key="quick_english_button"):
+            st.session_state['quick_response_lang'] = 'en'
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Placeholder for item name (to be replaced by user)
-    item_placeholder = "{Item} (Color: {Color}, Size: {Size})"
-
-    # Quick response messages
+    # Show responses only if a language is selected
     if st.session_state['quick_response_lang'] == 'zh':
         # 快速落單
         st.markdown('<div class="item-container"><p class="item-label">快速落單</p>', unsafe_allow_html=True)
-        express_order_zh = f"""快速落單💨
+        express_order_zh = """快速落單💨
 
 㩒一㩒「出價」同埋留低以下資料就可以快速落單㗎喇🤝🏻
 
-鞋款：{item_placeholder}
+鞋款：
 顏色：
 碼數：
 姓名：
@@ -234,7 +234,7 @@ Yu Txx Lxx
 Payme
 Tap to PayMe!
 https://payme.hsbc/overdraw9"""
-        st.text_area("", value=payment_method, height=150, disabled=True, key="payment_method")
+        st.text_area("", value=payment_method, height=150, disabled=True, key="payment_method_zh")
         st.markdown('</div>', unsafe_allow_html=True)
 
         # 落單成功
@@ -247,14 +247,14 @@ https://payme.hsbc/overdraw9"""
         st.text_area("", value=completed_order_zh, height=150, disabled=True, key="completed_order_zh")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    else:
+    elif st.session_state['quick_response_lang'] == 'en':
         # Express Order
         st.markdown('<div class="item-container"><p class="item-label">Express Order</p>', unsafe_allow_html=True)
-        express_order_en = f"""Express Order💨
+        express_order_en = """Express Order💨
 
 Please fill in the information below and click "Make Offer" button for placing order🤝🏻
 
-Shoe: {item_placeholder}
+Shoe:
 Color:
 Size:
 Name:
@@ -278,7 +278,7 @@ Yu Txx Lxx
 Payme
 Tap to PayMe!
 https://payme.hsbc/overdraw9"""
-        st.text_area("", value=payment_method, height=150, disabled=True, key="payment_method")
+        st.text_area("", value=payment_method, height=150, disabled=True, key="payment_method_en")
         st.markdown('</div>', unsafe_allow_html=True)
 
         # Completed Order
