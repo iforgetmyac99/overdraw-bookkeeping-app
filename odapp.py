@@ -424,3 +424,4 @@ elif st.session_state['page'] == 'Quick Responses':
     for response in quick_responses:
         st.write(response)
         copy_to_clipboard(response)
+
