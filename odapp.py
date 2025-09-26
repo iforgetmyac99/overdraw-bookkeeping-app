@@ -8,7 +8,6 @@ import re
 from datetime import datetime
 from builtins import max
 from st_clipboard import copy_to_clipboard  # For reliable clipboard copying
-import streamlit_authenticator as stauth
 import requests
 from urllib.parse import urlencode
 
@@ -48,18 +47,18 @@ def google_login():
     # Google OAuth2 configuration
     client_id = st.secrets["google_oauth"]["client_id"]
     redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
-    auth_url = "https://accounts.google.com/o/oauth2/v2/auth?{urlencode({
+    auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
         'client_id': client_id,
         'redirect_uri': redirect_uri,
         'response_type': 'code',
         'scope': 'email profile',
         'access_type': 'offline',
         'prompt': 'consent'
-    })}"
+    })
 
     # Display Login button
     if st.session_state['auth_state'] == 'not_authenticated':
-        st.markdown('<div class="login-button"><a href="{}"><button>Login with Google</button></a></div>'.format(auth_url), unsafe_allow_html=True)
+        st.markdown(f'<div class="login-button"><a href="{auth_url}"><button>Login with Google</button></a></div>', unsafe_allow_html=True)
         st.stop()
 
     # Handle OAuth callback
@@ -280,7 +279,7 @@ def order_details_page():
 
     # Display order details with copy buttons (Task 5: Unified "Copy" label)
     st.write(f"**Order Number:** {order_row['Order']}")
-    st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})")
+    st.write(f"**Item, Color, Size:** {order_row['Item']} (Color: {row['Color']}, Size: {row['Size']})")
     st.write(f"**Name:**")
     st.text_area("", value=order_row['Name'], height=50, disabled=True, key="name_box")
     if st.button("Copy", key="copy_name"):
@@ -480,4 +479,3 @@ else:
             st.write(response)
             if st.button("Copy", key=f"copy_response_{response}"):
                 copy_to_clipboard(response)
-
