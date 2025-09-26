@@ -30,7 +30,13 @@ def reset_page_state(page):
         st.session_state['search_query'] = ""  # Clear search input
     st.session_state['last_page'] = page  # Track current page
 
-# Login Implementation
+# Navigation helper
+def go_home():
+    st.session_state['page'] = 'Home'
+    st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+    reset_page_state('Home')
+
+# Login Implementation (Issue 1: Start at Home page on new login)
 def login_page():
     st.title("OverDraw Management Portal")
     st.markdown("""
@@ -49,10 +55,9 @@ def login_page():
             if username == "iforgetmyac" and password == "OverDraw@99":
                 st.session_state['logged_in'] = True
                 st.session_state['last_activity'] = time.time()
-                if 'page' not in st.session_state:
-                    st.session_state['page'] = 'Home'
-                st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-                reset_page_state(st.session_state['page'])
+                st.session_state['page'] = 'Home'  # Always start at Home on new login
+                st.query_params.update({"logged_in": "true", "page": "Home"})
+                reset_page_state('Home')
                 st.rerun()
             else:
                 st.error("Invalid credentials.")
@@ -106,7 +111,6 @@ def extract_data(template_text):
     phone = phone_en.group(1) if phone_en else (phone_zh.group(1) if phone_zh else "")
     address = address_en.group(1).strip() if address_en else (address_zh.group(1).strip() if address_zh else "")
 
-    # Log warnings for missing fields
     if not all([item, color, size, name, phone, address]):
         st.warning("Some fields are missing in the template. Please verify the input.")
 
@@ -160,7 +164,7 @@ quick_responses = [
     "Sorry, item out of stock."
 ]
 
-# Callback for clearing input in Book Keeping (Issue 1)
+# Callback for clearing input in Book Keeping
 def clear_template_input():
     if 'success' in st.session_state:
         del st.session_state['success']
@@ -195,7 +199,7 @@ def home_page():
         reset_page_state('Quick Responses')
         st.rerun()
 
-# Pending Orders page (Issue 3)
+# Pending Orders page
 @st.cache_data
 def get_pending_df(_refresh_trigger):
     sheet = load_gspread()
@@ -209,7 +213,7 @@ def pending_orders_page():
     with col1:
         st.title("Pending Orders")
     with col2:
-        st.button("Home", key="home_button_pending", on_click=lambda: st.session_state.update({'page': 'Home', 'refresh_trigger': time.time()}))
+        st.button("Home", key="home_button_pending", on_click=go_home)
     
     if 'refresh_trigger' not in st.session_state:
         st.session_state['refresh_trigger'] = time.time()
@@ -246,7 +250,7 @@ def pending_orders_page():
     else:
         st.write("No pending orders found.")
 
-    # Handle navigation after button clicks
+    # Handle navigation
     if st.session_state.get('page') != 'Pending Orders':
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state(st.session_state['page'])
@@ -258,7 +262,7 @@ def order_details_page():
     with col1:
         st.title("Order Details")
     with col2:
-        st.button("Home", key="home_button_details", on_click=lambda: st.session_state.update({'page': 'Home', 'refresh_trigger': time.time()}))
+        st.button("Home", key="home_button_details", on_click=go_home)
     st.button("Return", key="return_button", on_click=lambda: st.session_state.update({'page': 'Pending Orders', 'refresh_trigger': time.time()}))
     st.markdown("""
     <style>
@@ -360,7 +364,7 @@ def order_details_page():
             else:
                 st.error("Failed to update order status.")
 
-    # Handle navigation after button clicks
+    # Handle navigation
     if st.session_state.get('page') != 'Order Details':
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state(st.session_state['page'])
@@ -372,7 +376,7 @@ def order_completed_page():
     with col1:
         st.title("Order Completed")
     with col2:
-        st.button("Home", key="home_button_completed", on_click=lambda: st.session_state.update({'page': 'Home', 'refresh_trigger': time.time()}))
+        st.button("Home", key="home_button_completed", on_click=go_home)
     if 'selected_order' not in st.session_state:
         st.error("No order selected.")
         return
@@ -403,8 +407,7 @@ def order_completed_page():
 
 # Main App
 query_params = st.query_params.to_dict()
-if 'logged_in' in query_params and query_params['logged_in'] == 'true' and 'page' in query_params:
-    st.session_state['logged_in'] = True
+if 'logged_in' in query_params and query_params['logged_in'] == 'true' and 'page' in query_params and st.session_state.get('logged_in'):
     st.session_state['page'] = query_params['page']
     st.session_state['last_activity'] = time.time()  # Reset activity timer on refresh
 
@@ -435,7 +438,7 @@ else:
         with col1:
             st.title("Transaction Record")
         with col2:
-            st.button("Home", key="home_button", on_click=lambda: st.session_state.update({'page': 'Home', 'refresh_trigger': time.time()}))
+            st.button("Home", key="home_button", on_click=go_home)
         st.markdown("""
         <style>
         .stTextInput, .stTextArea { width: 100% !important; }
@@ -478,10 +481,7 @@ else:
         elif 'error' in st.session_state:
             st.error(f"Failed to add entry: {st.session_state['error']}")
             if st.button("Home"):
-                st.session_state['page'] = 'Home'
-                del st.session_state['error']
-                st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-                reset_page_state('Home')
+                go_home()
                 st.rerun()
 
     elif st.session_state['page'] == 'Pending Orders':
@@ -495,7 +495,7 @@ else:
         with col1:
             st.title("Transaction Record")
         with col2:
-            st.button("Home", key="home_button_record", on_click=lambda: st.session_state.update({'page': 'Home', 'refresh_trigger': time.time()}))
+            st.button("Home", key="home_button_record", on_click=go_home)
         st.markdown("""
         <style>
         .stTextInput, .stTextArea { width: 100% !important; }
@@ -506,7 +506,7 @@ else:
         <script>
         document.querySelectorAll('textarea').forEach(textarea => {
             textarea.addEventListener('dblclick', function() {
-            this.select();
+                this.select();
             });
         });
         </script>
@@ -535,7 +535,7 @@ else:
         with col1:
             st.title("Transaction Record")
         with col2:
-            st.button("Home", key="home_button_quick", on_click=lambda: st.session_state.update({'page': 'Home', 'refresh_trigger': time.time()}))
+            st.button("Home", key="home_button_quick", on_click=go_home)
         st.markdown("""
         <style>
         .stTextInput, .stTextArea { width: 100% !important; }
