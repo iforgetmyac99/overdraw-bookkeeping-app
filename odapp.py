@@ -469,6 +469,7 @@ def order_details_page():
     if 'show_submit' not in st.session_state:
         st.session_state['show_submit'] = True
     if st.session_state['show_submit'] and st.button("Submit"):
+        sf_input = st.session_state.get("sf_input", "")
         if sf_input:
             if update_sf_delivery(st.session_state['selected_order'], sf_input):
                 st.session_state['success'] = True
@@ -684,3 +685,4 @@ else:
 
     elif st.session_state['page'] == 'Quick Responses':
         quick_responses_page()
+
