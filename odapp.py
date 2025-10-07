@@ -117,20 +117,20 @@ def extract_data(template_text):
     item = item_en.group(1).strip() if item_en else (item_zh.group(1).strip() if item_zh else "")
     color = color_en.group(1).strip() if color_en else (color_zh.group(1).strip() if color_zh else "")
     size = size_en.group(1) if size_en else (size_zh.group(1) if size_zh else "")
-    name = name_en.group(1).strip() if name_en else (name_zh.group(1).strip() if name_zh else "")
+    carousell_id = name_en.group(1).strip() if name_en else (name_zh.group(1).strip() if name_zh else "")
     phone = phone_en.group(1) if phone_en else (phone_zh.group(1) if phone_zh else "")
     address = address_en.group(1).strip() if address_en else (address_zh.group(1).strip() if address_zh else "")
 
     if not all([item, color, size, name, phone, address]):
         st.warning("Some fields are missing in the template. Please verify the input.")
 
-    return order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number
+    return order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number
 
 # Add to Sheet
-def add_to_sheet(order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number):
+def add_to_sheet(order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number):
     try:
         sheet = load_gspread()
-        sheet.append_row([order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number])
+        sheet.append_row([order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number])
         return True
     except Exception as e:
         return str(e)
@@ -469,7 +469,6 @@ def order_details_page():
     if 'show_submit' not in st.session_state:
         st.session_state['show_submit'] = True
     if st.session_state['show_submit'] and st.button("Submit"):
-        sf_input = st.session_state.get("sf_input", "")
         if sf_input:
             if update_sf_delivery(st.session_state['selected_order'], sf_input):
                 st.session_state['success'] = True
@@ -612,9 +611,9 @@ else:
             st.session_state['show_button'] = True
         if st.session_state['show_button'] and st.button("Process and Add"):
             if template_text:
-                order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number = extract_data(template_text)
-                if all([item, color, size, name, phone, address]):
-                    result = add_to_sheet(order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number)
+                order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number = extract_data(template_text)
+                if all([item, color, size, carousell_id, phone, address]):
+                    result = add_to_sheet(order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number)
                     if result is True:
                         st.session_state['success'] = True
                         st.session_state['show_button'] = False
@@ -685,4 +684,3 @@ else:
 
     elif st.session_state['page'] == 'Quick Responses':
         quick_responses_page()
-
