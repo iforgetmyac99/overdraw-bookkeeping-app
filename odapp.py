@@ -122,13 +122,13 @@ def extract_data(template_text):
     if not all([item, color, size, name, phone, address]):
         st.warning("Some fields are missing in the template. Please verify the input.")
 
-    return order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number
+    return order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number
 
 # Add to Sheet
-def add_to_sheet(order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number):
+def add_to_sheet(order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number):
     try:
         sheet = load_gspread()
-        sheet.append_row([order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number])
+        sheet.append_row([order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number])
         return True
     except Exception as e:
         return str(e)
@@ -609,8 +609,8 @@ else:
             st.session_state['show_button'] = True
         if st.session_state['show_button'] and st.button("Process and Add"):
             if template_text:
-                order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number = extract_data(template_text)
-                if all([item, color, size, name, phone, address]):
+                order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number = extract_data(template_text)
+                if all([item, color, size, phone, address]):
                     result = add_to_sheet(order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number)
                     if result is True:
                         st.session_state['success'] = True
