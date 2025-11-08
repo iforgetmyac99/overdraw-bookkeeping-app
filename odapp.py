@@ -90,14 +90,11 @@ def extract_data(template_text):
         order_num = "OD001"
 
     date = datetime.now().strftime("%d/%m/%Y")
-    carousell_id = ""
     item = ""
     color = ""
     size = ""
     status = "Pending"
     name = ""
-    phone = ""
-    address = ""
     sf_delivery_number = ""
 
     item_en = re.search(r'Shoe:\s*([^\n]+)', template_text)
