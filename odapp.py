@@ -90,7 +90,6 @@ def extract_data(template_text):
         order_num = "OD001"
 
     date = datetime.now().strftime("%d/%m/%Y")
-    carousell_id = ""
     item = ""
     color = ""
     size = ""
