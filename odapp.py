@@ -118,6 +118,7 @@ def extract_data(template_text):
     color = color_en.group(1).strip() if color_en else (color_zh.group(1).strip() if color_zh else "")
     size = size_en.group(1) if size_en else (size_zh.group(1) if size_zh else "")
     name = name_en.group(1).strip() if name_en else (name_zh.group(1).strip() if name_zh else "")
+    carousell_id = name  # Assign name to Carousell ID
     phone = phone_en.group(1) if phone_en else (phone_zh.group(1) if phone_zh else "")
     address = address_en.group(1).strip() if address_en else (address_zh.group(1).strip() if address_zh else "")
 
