@@ -611,7 +611,7 @@ else:
             st.session_state['show_button'] = True
         if st.session_state['show_button'] and st.button("Process and Add"):
             if template_text:
-                order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number = extract_data(template_text)
+                order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number = extract_data(template_text)
                 if all([item, color, size, name, phone, address]):
                     result = add_to_sheet(order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number)
                     if result is True:
@@ -684,3 +684,4 @@ else:
 
     elif st.session_state['page'] == 'Quick Responses':
         quick_responses_page()
+
