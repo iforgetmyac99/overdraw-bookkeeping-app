@@ -90,11 +90,15 @@ def extract_data(template_text):
         order_num = "OD001"
 
     date = datetime.now().strftime("%d/%m/%Y")
+    carousell_id = ""
     item = ""
     color = ""
     size = ""
     status = "Pending"
     name = ""
+    carousell_id = name  # Assign name to Carousell ID
+    phone = ""
+    address = ""
     sf_delivery_number = ""
 
     item_en = re.search(r'Shoe:\s*([^\n]+)', template_text)
@@ -122,7 +126,7 @@ def extract_data(template_text):
     if not all([item, color, size, name, phone, address]):
         st.warning("Some fields are missing in the template. Please verify the input.")
 
-    return order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number
+    return order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number
 
 # Add to Sheet
 def add_to_sheet(order_num, date, carousell_id, item, color, size, status, name, phone, address, sf_delivery_number):
