@@ -596,3 +596,127 @@ def photo_portal_list_page():
                 st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
                 st.rerun()
 
+# === Main Router ===
+query_params = st.query_params.to_dict()
+if 'logged_in' in query_params and query_params['logged_in'] == 'true' and 'page' in query_params and st.session_state.get('logged_in'):
+    st.session_state['page'] = query_params['page']
+    st.session_state['last_activity'] = time.time()
+
+if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
+    login_page()
+else:
+    current_time = time.time()
+    if 'last_activity' not in st.session_state:
+        st.session_state['last_activity'] = current_time
+    if current_time - st.session_state['last_activity'] > 600:
+        del st.session_state['logged_in']
+        if 'page' in st.session_state:
+            del st.session_state['page']
+        st.query_params.clear()
+        reset_page_state('Login')
+        st.rerun()
+    st.session_state['last_activity'] = current_time
+    if 'page' not in st.session_state:
+        st.session_state['page'] = 'Home'
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+
+    if st.session_state['page'] == 'Home':
+        home_page()
+    elif st.session_state['page'] == 'Book Keeping':
+        col1, col2 = st.columns([8, 1])
+        with col1:
+            st.title("Transaction Record")
+        with col2:
+            st.button("Home", key="home_button", on_click=go_home)
+        st.markdown("""
+        <style>
+        .stTextInput, .stTextArea { width: 100% !important; }
+        .stDataFrame { width: 100%; overflow-x: auto; }
+        .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
+        .stTextArea textarea { user-select: all; }
+        </style>
+        <script>
+        document.querySelectorAll('textarea').forEach(textarea => {
+            textarea.addEventListener('dblclick', function() {
+                this.select();
+            });
+        });
+        </script>
+        """, unsafe_allow_html=True)
+        st.markdown('<h3 style="font-size: 1.4em;">Paste transaction here.</h3>', unsafe_allow_html=True)
+        template_text = st.text_area("", value=st.session_state.get('input_text', ""), height=200, key="template_text")
+        if 'show_button' not in st.session_state:
+            st.session_state['show_button'] = True
+        if st.session_state['show_button'] and st.button("Process and Add"):
+            if template_text:
+                order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number = extract_data(template_text)
+                if all([item, color, size, phone, address]):
+                    result = add_to_sheet(order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number)
+                    if result is True:
+                        st.session_state['success'] = True
+                        st.session_state['show_button'] = False
+                        st.session_state['input_text'] = ""
+                        st.rerun()
+                    else:
+                        st.session_state['error'] = result
+                        st.rerun()
+                else:
+                    st.error("Couldn't extract all required data. Check template.")
+            else:
+                st.error("Enter template text.")
+        if 'success' in st.session_state:
+            st.success("Entry added successfully!", icon="Checkmark")
+            st.button("Add Another Entry", on_click=clear_template_input)
+        elif 'error' in st.session_state:
+            st.error(f"Failed to add entry: {st.session_state['error']}")
+            if st.button("Home"):
+                go_home()
+    elif st.session_state['page'] == 'Pending Orders':
+        pending_orders_page()
+    elif st.session_state['page'] == 'Order Details':
+        order_details_page()
+    elif st.session_state['page'] == 'Record Checking':
+        col1, col2 = st.columns([8, 1])
+        with col1:
+            st.title("Transaction Record")
+        with col2:
+            st.button("Home", key="home_button_record", on_click=go_home)
+        st.markdown("""
+        <style>
+        .stTextInput, .stTextArea { width: 100% !important; }
+        .stDataFrame { width: 100%; overflow-x: auto; }
+        .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
+        .stTextArea textarea { user-select: all; }
+        </style>
+        <script>
+        document.querySelectorAll('textarea').forEach(textarea => {
+            textarea.addEventListener('dblclick', function() {
+                this.select();
+            });
+        });
+        </script>
+        """, unsafe_allow_html=True)
+        st.header("Record Checking")
+        query = st.text_input("Enter search terms (e.g., date, shoe model, name)", value=st.session_state.get('search_query', ""))
+        if st.button("Search"):
+            if query:
+                st.session_state['search_query'] = query
+                results = search_sheet(query)
+                if not results.empty:
+                    st.dataframe(results, use_container_width=True)
+                else:
+                    st.warning("No matches found.")
+            else:
+                st.error("Enter search terms.")
+        if st.session_state.get('page') != 'Record Checking':
+            st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+            reset_page_state(st.session_state['page'])
+            st.rerun()
+    elif st.session_state['page'] == 'Quick Responses':
+        quick_responses_page()
+    elif st.session_state['page'] == 'Stock Taking':
+        stock_taking_page()
+    elif st.session_state['page'] == 'Photo Portal':
+        photo_portal_list_page()
+
+
