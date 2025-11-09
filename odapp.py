@@ -94,7 +94,7 @@ def update_cost(stock_id, cost):
 def reset_page_state(page):
     state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang',
                   'quick_response_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger',
-                  'stock_shoe_input', 'stock_created']
+                  'stock_created']
     for key in state_keys:
         if key in st.session_state:
             del st.session_state[key]
@@ -461,9 +461,12 @@ def stock_taking_page():
     with col2: st.button("Home", key="home_stock", on_click=go_home)
     st.markdown("<style>.stTextInput, .stTextArea { width: 100% !important; }</style>", unsafe_allow_html=True)
 
-    shoe_input = st.text_area("Enter shoe names (one per line)", height=150, key="stock_shoe_input")
+    # Use form to avoid widget key conflict
+    with st.form(key="stock_form"):
+        shoe_input = st.text_area("Enter shoe names (one per line)", height=150, key="stock_shoe_input")
+        submit_btn = st.form_submit_button("Create Folders & Add to Stock")
 
-    if st.button("Create Folders & Add to Stock", key="create_folder_btn"):
+    if submit_btn:
         lines = [line.strip() for line in shoe_input.splitlines() if line.strip()]
         if not lines:
             st.error("Enter at least one shoe name.")
@@ -480,7 +483,7 @@ def stock_taking_page():
                 st.session_state['stock_created'] = True
             else:
                 st.error("Failed to add to Stock sheet.")
-            st.session_state['stock_shoe_input'] = ""
+            # Clear input by rerunning; form will reset
             get_empty_folders.clear()
             st.rerun()
 
