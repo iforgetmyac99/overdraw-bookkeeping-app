@@ -335,9 +335,15 @@ def home_page():
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Book Keeping')
         st.rerun()
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('Book Keeping')
+        st.rerun()
 
     if st.button("Pending Orders"):
         st.session_state['page'] = 'Pending Orders'
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('Pending Orders')
+        st.rerun()
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Pending Orders')
         st.rerun()
@@ -347,15 +353,24 @@ def home_page():
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Record Checking')
         st.rerun()
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('Record Checking')
+        st.rerun()
 
     if st.button("Quick Responses"):
         st.session_state['page'] = 'Quick Responses'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Quick Responses')
         st.rerun()
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('Quick Responses')
+        st.rerun()
 
     if st.button("Stock Taking"):
         st.session_state['page'] = 'Stock Taking'
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('Stock Taking')
+        st.rerun()
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Stock Taking')
         st.rerun()
@@ -380,6 +395,10 @@ def pending_orders_page():
     if 'refresh_trigger' not in st.session_state:
         st.session_state['refresh_trigger'] = time.time()
     if st.button("Refresh", key="refresh_button_pending"):
+        st.session_state['page'] = 'Refresh", key="refresh_button_pending'
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('Refresh", key="refresh_button_pending')
+        st.rerun()
         get_pending_df.clear()
         st.session_state['refresh_trigger'] = time.time()
     pending_df = get_pending_df(st.session_state['refresh_trigger'])
@@ -402,9 +421,12 @@ def pending_orders_page():
         st.write(f"Found {len(pending_df)} pending orders:")
         st.dataframe(pending_df, use_container_width=True)
         for index, row in pending_df.iterrows():
-            if st.button(f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})", key=f"order_{row['Order']}"):
+    if st.button("f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']}"):
+        st.session_state['page'] = 'f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']}'
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']}')
+        st.rerun()
                 st.session_state['selected_order'] = row['Order']
-                st.session_state['page'] = 'Order Details'
                 st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
                 reset_page_state('Order Details')
                 st.rerun()
@@ -416,7 +438,6 @@ def pending_orders_page():
         st.rerun()
 
 def go_pending():
-    st.session_state['page'] = 'Pending Orders'
     st.session_state['refresh_trigger'] = time.time()
     reset_page_state('Pending Orders')
     st.rerun()
@@ -496,18 +517,29 @@ def order_details_page():
             st.text_area("", value=message, height=100, disabled=True, key="message_english")
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("English", key="english_button"):
+    if st.button("English", key="english_button"):
+        st.session_state['page'] = 'English", key="english_button'
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('English", key="english_button')
+        st.rerun()
                 st.session_state['message_lang'] = 'en'
                 st.rerun()
         with col2:
-            if st.button("中文", key="chinese_button"):
+    if st.button("中文", key="chinese_button"):
+        st.session_state['page'] = '中文", key="chinese_button'
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('中文", key="chinese_button')
+        st.rerun()
                 st.session_state['message_lang'] = 'zh'
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
-        if st.button("Finish"):
+    if st.button("Finish"):
+        st.session_state['page'] = 'Finish'
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('Finish')
+        st.rerun()
             if update_order_status(st.session_state['selected_order'], "Delivered"):
                 del st.session_state['success']
-                st.session_state['page'] = 'Pending Orders'
                 st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
                 reset_page_state('Pending Orders')
                 st.rerun()
@@ -538,7 +570,11 @@ def stock_taking_page():
     
     col_create, col_portal = st.columns([1, 1])
     with col_create:
-        if st.button("Create Folders", key="create_folder_btn"):
+    if st.button("Create Folders", key="create_folder_btn"):
+        st.session_state['page'] = 'Create Folders", key="create_folder_btn'
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('Create Folders", key="create_folder_btn')
+        st.rerun()
             lines = [line.strip() for line in shoe_input.splitlines() if line.strip()]
             if not lines:
                 st.error("Enter at least one shoe name.")
@@ -555,8 +591,11 @@ def stock_taking_page():
                 st.rerun()
     
     with col_portal:
-        if st.button("Photo Portal"):
-            st.session_state['page'] = 'Photo Portal'
+    if st.button("Photo Portal"):
+        st.session_state['page'] = 'Photo Portal'
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('Photo Portal')
+        st.rerun()
             st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
             reset_page_state('Photo Portal')
             st.rerun()
@@ -602,24 +641,26 @@ def photo_upload_page():
         st.title(f"Upload Photos: {st.session_state['selected_folder_name']}")
     with col2:
         st.button("Home", key="home_photo_upload", on_click=go_home)
-
+    
     uploaded_files = st.file_uploader(
         "Choose photos from your album",
         type=['png', 'jpg', 'jpeg'],
         accept_multiple_files=True,
         key="photo_uploader"
     )
-
+    
     if uploaded_files:
-        st.image(uploaded_files[0], width=200)  # Thumbnail preview
         if st.button("Upload Photos"):
-            with st.spinner(f"Uploading {len(uploaded_files)} photo(s)..."):
-                results = upload_photos_to_folder(st.session_state['selected_folder_id'], uploaded_files)
+            if not uploaded_files:
+                st.error("No photos selected.")
+            else:
+                with st.spinner(f"Uploading {len(uploaded_files)} photo(s)..."):
+                    results = upload_photos_to_folder(st.session_state['selected_folder_id'], uploaded_files)
+                success_count = sum(1 for _, ok in results if ok)
+                fail_count = len(results) - success_count
                 st.session_state['upload_results'] = results
-                if 'empty_folders' in st.session_state:
-                    del st.session_state['empty_folders']
                 st.rerun()
-
+    
     if 'upload_results' in st.session_state:
         results = st.session_state['upload_results']
         success_count = sum(1 for _, ok in results if ok)
@@ -627,41 +668,14 @@ def photo_upload_page():
             st.success(f"Uploaded {success_count} photo(s) successfully!")
         if success_count < len(results):
             st.error(f"{len(results) - success_count} failed.")
-        for name, msg in results:
-            if not isinstance(msg, bool):
-                st.code(f"{name}: {msg}")
-
-        if st.button("Mark as Complete"):
-            try:
-                service = get_drive_service()
-                root_id = st.secrets["drive"]["root_folder_id"]
-                query = f"'{root_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = 'Completed' and trashed = false"
-                results = service.files().list(q=query, fields="files(id)").execute()
-                folders = results.get('files', [])
-                if folders:
-                    completed_id = folders[0]['id']
-                else:
-                    folder_metadata = {
-                        'name': 'Completed',
-                        'mimeType': 'application/vnd.google-apps.folder',
-                        'parents': [root_id]
-                    }
-                    folder = service.files().create(body=folder_metadata, fields='id').execute()
-                    completed_id = folder['id']
-                service.files().update(
-                    fileId=st.session_state['selected_folder_id'],
-                    addParents=completed_id,
-                    removeParents=root_id,
-                    fields='id, parents'
-                ).execute()
-                st.success("Folder marked as complete and moved to Completed folder.")
-            except Exception as e:
-                st.error(f"Failed to move folder: {e}")
-
+            for name, msg in results:
+                if not isinstance(msg, bool):
+                    st.code(f"{name}: {msg}")
+        
         if st.button("Back to List"):
-            if 'empty_folders' in st.session_state:
-                del st.session_state['empty_folders']
             st.session_state['page'] = 'Photo Portal'
+            st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+            reset_page_state('Photo Portal')
             st.rerun()
 
 # === Main Router ===
@@ -686,7 +700,7 @@ else:
     st.session_state['last_activity'] = current_time
     if 'page' not in st.session_state:
         st.session_state['page'] = 'Home'
-    st.session_state['page'] = 'Home'
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
 
     if st.session_state['page'] == 'Home':
         home_page()
@@ -788,6 +802,5 @@ else:
         photo_portal_list_page()
     elif st.session_state['page'] == 'Photo Upload':
         photo_upload_page()
-
 
 
