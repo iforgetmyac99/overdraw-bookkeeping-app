@@ -60,9 +60,9 @@ def get_next_stock_id():
         sh = load_gspread().worksheet("Stock")
         data = sh.get_all_records()
         df = pd.DataFrame(data)
-        if df.empty or 'Stock ID' not in df.columns:
+        if df.empty or 'ID' not in df.columns:
             return 1
-        return int(df['Stock ID'].max()) + 1
+        return int(df['ID'].max()) + 1
     except Exception:
         return 1
 
@@ -82,7 +82,7 @@ def update_cost(stock_id, cost):
         sh = load_gspread().worksheet("Stock")
         data = sh.get_all_records()
         df = pd.DataFrame(data)
-        row_idx = df.index[df['Stock ID'] == stock_id].tolist()
+        row_idx = df.index[df['ID'] == stock_id].tolist()
         if row_idx:
             cell = f"C{row_idx[0] + 2}"
             sh.update(cell, [[cost]])
@@ -461,7 +461,6 @@ def stock_taking_page():
     with col2: st.button("Home", key="home_stock", on_click=go_home)
     st.markdown("<style>.stTextInput, .stTextArea { width: 100% !important; }</style>", unsafe_allow_html=True)
 
-    # Use form to avoid widget key conflict
     with st.form(key="stock_form"):
         shoe_input = st.text_area("Enter shoe names (one per line)", height=150, key="stock_shoe_input")
         submit_btn = st.form_submit_button("Create Folders & Add to Stock")
@@ -483,21 +482,19 @@ def stock_taking_page():
                 st.session_state['stock_created'] = True
             else:
                 st.error("Failed to add to Stock sheet.")
-            # Clear input by rerunning; form will reset
             get_empty_folders.clear()
             st.rerun()
 
-    # Show cost module only after creation
     if st.session_state.get('stock_created'):
         st.markdown("### Enter Cost for New Stock")
         try:
             sh = load_gspread().worksheet("Stock")
             data = sh.get_all_records()
             df = pd.DataFrame(data)
-            pending_cost = df[df['Cost'].isnull() | (df['Cost'] == "")].sort_values("Stock ID", ascending=False)
+            pending_cost = df[df['Cost'].isnull() | (df['Cost'] == "")].sort_values("ID", ascending=False)
             if not pending_cost.empty:
                 for _, row in pending_cost.iterrows():
-                    sid = row['Stock ID']
+                    sid = row['ID']
                     product = row['Product']
                     col_id, col_name, col_input = st.columns([1, 5, 2])
                     with col_id:
