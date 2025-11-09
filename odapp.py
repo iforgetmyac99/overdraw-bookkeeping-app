@@ -1,3 +1,4 @@
+# odapp.py
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
@@ -34,7 +35,8 @@ def create_drive_folder(shoe_name):
         return str(e)
 
 def reset_page_state(page):
-    state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang', 'quick_response_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger']
+    state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang',
+                  'quick_response_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger']
     for key in state_keys:
         if key in st.session_state:
             del st.session_state[key]
@@ -46,8 +48,6 @@ def reset_page_state(page):
         st.session_state['search_query'] = ""
     elif page == 'Quick Responses':
         st.session_state['quick_response_lang'] = None
-    elif page == 'Stock Taking':
-        pass
     st.session_state['last_page'] = page
 
 def go_home():
@@ -287,26 +287,31 @@ def home_page():
         st.title("Home Page")
     with col2:
         st.button("Home", disabled=True, key="home_button_home")
+
     if st.button("Book Keeping"):
         st.session_state['page'] = 'Book Keeping'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Book Keeping')
         st.rerun()
+
     if st.button("Pending Orders"):
         st.session_state['page'] = 'Pending Orders'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Pending Orders')
         st.rerun()
+
     if st.button("Record Checking"):
         st.session_state['page'] = 'Record Checking'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Record Checking')
         st.rerun()
+
     if st.button("Quick Responses"):
         st.session_state['page'] = 'Quick Responses'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Quick Responses')
         st.rerun()
+
     if st.button("Stock Taking"):
         st.session_state['page'] = 'Stock Taking'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
@@ -499,10 +504,12 @@ def stock_taking_page():
         reset_page_state(st.session_state['page'])
         st.rerun()
 
+# === Main Router ===
 query_params = st.query_params.to_dict()
 if 'logged_in' in query_params and query_params['logged_in'] == 'true' and 'page' in query_params and st.session_state.get('logged_in'):
     st.session_state['page'] = query_params['page']
     st.session_state['last_activity'] = time.time()
+
 if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
     login_page()
 else:
@@ -520,6 +527,7 @@ else:
     if 'page' not in st.session_state:
         st.session_state['page'] = 'Home'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+
     if st.session_state['page'] == 'Home':
         home_page()
     elif st.session_state['page'] == 'Book Keeping':
