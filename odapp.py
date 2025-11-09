@@ -61,10 +61,13 @@ def upload_photos_to_folder(folder_id, files):
     service = get_drive_service()
     results = []
     for file in files:
-        file_stream = io.BytesIO(file.getvalue())
-        media = MediaIoBaseUpload(file_stream, mimetype=file.type)
-        file_metadata = {'name': file.name, 'parents': [folder_id]}
         try:
+            file_stream = io.BytesIO(file.read())  # Correct way to read file
+            media = MediaIoBaseUpload(file_stream, mimetype=file.type, resumable=True)
+            file_metadata = {
+                'name': file.name,
+                'parents': [folder_id]
+            }
             uploaded = service.files().create(
                 body=file_metadata,
                 media_body=media,
@@ -74,6 +77,7 @@ def upload_photos_to_folder(folder_id, files):
         except Exception as e:
             results.append((file.name, str(e)))
     return results
+
 
 def reset_page_state(page):
     state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang',
@@ -763,5 +767,6 @@ else:
         photo_portal_list_page()
     elif st.session_state['page'] == 'Photo Upload':
         photo_upload_page()
+
 
 
