@@ -20,7 +20,8 @@ def load_gspread():
 def get_drive_service():
     scope = [
         'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive.file'  # Allows file creation in shared folders
+        'https://www.googleapis.com/auth/drive.file',      # Create files
+        'https://www.googleapis.com/auth/drive.readonly'  # List files to detect empty
     ]
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
     return build('drive', 'v3', credentials=creds)
@@ -64,7 +65,11 @@ def upload_photos_to_folder(folder_id, files):
         media = MediaIoBaseUpload(file_stream, mimetype=file.type)
         file_metadata = {'name': file.name, 'parents': [folder_id]}
         try:
-            uploaded = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+            uploaded = service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id, name'
+            ).execute()
             results.append((file.name, True))
         except Exception as e:
             results.append((file.name, str(e)))
@@ -758,4 +763,5 @@ else:
         photo_portal_list_page()
     elif st.session_state['page'] == 'Photo Upload':
         photo_upload_page()
+
 
