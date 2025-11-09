@@ -61,10 +61,13 @@ def upload_photos_to_folder(folder_id, files):
     service = get_drive_service()
     results = []
     for file in files:
-        file_stream = io.BytesIO(file.read())
-        media = MediaIoBaseUpload(file_stream, mimetype=file.type, resumable=True)
-        file_metadata = {'name': file.name, 'parents': [folder_id]}
         try:
+            file_stream = io.BytesIO(file.read())  # Correct way to read file
+            media = MediaIoBaseUpload(file_stream, mimetype=file.type, resumable=True)
+            file_metadata = {
+                'name': file.name,
+                'parents': [folder_id]
+            }
             uploaded = service.files().create(
                 body=file_metadata,
                 media_body=media,
