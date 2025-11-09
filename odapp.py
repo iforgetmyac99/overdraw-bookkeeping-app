@@ -739,3 +739,5 @@ else:
         quick_responses_page()
     elif st.session_state['page'] == 'Stock Taking':
         stock_taking_page()
+
+
