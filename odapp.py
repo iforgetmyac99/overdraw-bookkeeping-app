@@ -335,15 +335,9 @@ def home_page():
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Book Keeping')
         st.rerun()
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state('Book Keeping')
-        st.rerun()
 
     if st.button("Pending Orders"):
         st.session_state['page'] = 'Pending Orders'
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state('Pending Orders')
-        st.rerun()
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Pending Orders')
         st.rerun()
@@ -353,24 +347,15 @@ def home_page():
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Record Checking')
         st.rerun()
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state('Record Checking')
-        st.rerun()
 
     if st.button("Quick Responses"):
         st.session_state['page'] = 'Quick Responses'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Quick Responses')
         st.rerun()
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state('Quick Responses')
-        st.rerun()
 
     if st.button("Stock Taking"):
         st.session_state['page'] = 'Stock Taking'
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state('Stock Taking')
-        st.rerun()
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Stock Taking')
         st.rerun()
@@ -395,10 +380,6 @@ def pending_orders_page():
     if 'refresh_trigger' not in st.session_state:
         st.session_state['refresh_trigger'] = time.time()
     if st.button("Refresh", key="refresh_button_pending"):
-        st.session_state['page'] = 'Refresh", key="refresh_button_pending'
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state('Refresh", key="refresh_button_pending')
-        st.rerun()
         get_pending_df.clear()
         st.session_state['refresh_trigger'] = time.time()
     pending_df = get_pending_df(st.session_state['refresh_trigger'])
@@ -421,12 +402,9 @@ def pending_orders_page():
         st.write(f"Found {len(pending_df)} pending orders:")
         st.dataframe(pending_df, use_container_width=True)
         for index, row in pending_df.iterrows():
-    if st.button("f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']}"):
-        st.session_state['page'] = 'f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']}'
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state('f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']}')
-        st.rerun()
+            if st.button(f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})", key=f"order_{row['Order']}"):
                 st.session_state['selected_order'] = row['Order']
+                st.session_state['page'] = 'Order Details'
                 st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
                 reset_page_state('Order Details')
                 st.rerun()
@@ -438,11 +416,12 @@ def pending_orders_page():
         st.rerun()
 
 def go_pending():
+    st.session_state['page'] = 'Pending Orders'
     st.session_state['refresh_trigger'] = time.time()
     reset_page_state('Pending Orders')
     st.rerun()
 
-def order_details_page():
+        if st.button(f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})", key=f"order_{row['Order']}"):
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("Order Details")
@@ -517,29 +496,18 @@ def order_details_page():
             st.text_area("", value=message, height=100, disabled=True, key="message_english")
         col1, col2 = st.columns(2)
         with col1:
-    if st.button("English", key="english_button"):
-        st.session_state['page'] = 'English", key="english_button'
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state('English", key="english_button')
-        st.rerun()
+            if st.button("English", key="english_button"):
                 st.session_state['message_lang'] = 'en'
                 st.rerun()
         with col2:
-    if st.button("中文", key="chinese_button"):
-        st.session_state['page'] = '中文", key="chinese_button'
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state('中文", key="chinese_button')
-        st.rerun()
+            if st.button("中文", key="chinese_button"):
                 st.session_state['message_lang'] = 'zh'
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
-    if st.button("Finish"):
-        st.session_state['page'] = 'Finish'
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state('Finish')
-        st.rerun()
+        if st.button("Finish"):
             if update_order_status(st.session_state['selected_order'], "Delivered"):
                 del st.session_state['success']
+                st.session_state['page'] = 'Pending Orders'
                 st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
                 reset_page_state('Pending Orders')
                 st.rerun()
@@ -570,11 +538,7 @@ def stock_taking_page():
     
     col_create, col_portal = st.columns([1, 1])
     with col_create:
-    if st.button("Create Folders", key="create_folder_btn"):
-        st.session_state['page'] = 'Create Folders", key="create_folder_btn'
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state('Create Folders", key="create_folder_btn')
-        st.rerun()
+        if st.button("Create Folders", key="create_folder_btn"):
             lines = [line.strip() for line in shoe_input.splitlines() if line.strip()]
             if not lines:
                 st.error("Enter at least one shoe name.")
@@ -591,11 +555,8 @@ def stock_taking_page():
                 st.rerun()
     
     with col_portal:
-    if st.button("Photo Portal"):
-        st.session_state['page'] = 'Photo Portal'
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state('Photo Portal')
-        st.rerun()
+        if st.button("Photo Portal"):
+            st.session_state['page'] = 'Photo Portal'
             st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
             reset_page_state('Photo Portal')
             st.rerun()
@@ -802,5 +763,3 @@ else:
         photo_portal_list_page()
     elif st.session_state['page'] == 'Photo Upload':
         photo_upload_page()
-
-
