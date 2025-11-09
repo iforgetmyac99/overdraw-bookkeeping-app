@@ -3,10 +3,12 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
 import pandas as pd
 import re
 from datetime import datetime
 import time
+import io
 
 @st.cache_resource
 def load_gspread():
@@ -30,13 +32,45 @@ def create_drive_folder(shoe_name):
     }
     try:
         folder = service.files().create(body=folder_metadata, fields='id, webViewLink').execute()
-        return folder.get('webViewLink')
+        return folder.get('id'), folder.get('webViewLink')
     except Exception as e:
-        return str(e)
+        return None, str(e)
+
+def get_empty_folders():
+    service = get_drive_service()
+    root_id = st.secrets["drive"]["root_folder_id"]
+    query = f"'{root_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    results = service.files().list(q=query, fields="files(id, name)").execute()
+    folders = results.get('files', [])
+    empty_folders = []
+    for folder in folders:
+        folder_id = folder['id']
+        folder_name = folder['name']
+        # Check if folder has any files (non-folder)
+        file_query = f"'{folder_id}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false"
+        file_results = service.files().list(q=file_query, pageSize=1, fields="files(id)").execute()
+        if not file_results.get('files'):
+            empty_folders.append((folder_name, folder_id))
+    return sorted(empty_folders, key=lambda x: x[0].lower())
+
+def upload_photos_to_folder(folder_id, files):
+    service = get_drive_service()
+    results = []
+    for file in files:
+        file_stream = io.BytesIO(file.getvalue())
+        media = MediaIoBaseUpload(file_stream, mimetype=file.type)
+        file_metadata = {'name': file.name, 'parents': [folder_id]}
+        try:
+            uploaded = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+            results.append((file.name, True))
+        except Exception as e:
+            results.append((file.name, str(e)))
+    return results
 
 def reset_page_state(page):
     state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang',
-                  'quick_response_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger']
+                  'quick_response_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger',
+                  'empty_folders', 'selected_folder_id', 'selected_folder_name', 'upload_results']
     for key in state_keys:
         if key in st.session_state:
             del st.session_state[key]
@@ -490,46 +524,112 @@ def stock_taking_page():
     
     shoe_input = st.text_area(
         "Enter shoe names (one per line)", 
-        placeholder="Nike Air Force 1\nAdidas Ultraboost\nJordan 1\nPuma RS-X",
         height=150,
         key="stock_shoe_input"
     )
     
-    if st.button("Create Folders", key="create_folder_btn"):
-        lines = [line.strip() for line in shoe_input.splitlines() if line.strip()]
-        if not lines:
-            st.error("Enter at least one shoe name.")
-            return
-        
-        results = []
-        with st.spinner(f"Creating {len(lines)} folder(s) in Google Drive..."):
-            for name in lines:
-                link = create_drive_folder(name)
-                if "drive.google.com" in link:
-                    results.append((name, link, True))
-                else:
-                    results.append((name, link, False))
-        
-        # Show results
-        success_count = sum(1 for _, _, ok in results if ok)
-        fail_count = len(results) - success_count
-        
-        if success_count > 0:
-            st.success(f"Created {success_count} folder(s) successfully!")
-            for name, link, ok in results:
-                if ok:
-                    st.markdown(f"**{name}** → [{link}]({link})")
-        
-        if fail_count > 0:
-            st.error(f"{fail_count} folder(s) failed:")
-            for name, link, ok in results:
-                if not ok:
-                    st.code(f"{name}: {link}")
+    col_create, col_portal = st.columns([1, 1])
+    with col_create:
+        if st.button("Create Folders", key="create_folder_btn"):
+            lines = [line.strip() for line in shoe_input.splitlines() if line.strip()]
+            if not lines:
+                st.error("Enter at least one shoe name.")
+            else:
+                created_count = 0
+                with st.spinner(f"Creating {len(lines)} folder(s)..."):
+                    for name in lines:
+                        folder_id, link = create_drive_folder(name)
+                        if folder_id:
+                            created_count += 1
+                if created_count > 0:
+                    st.success(f"Created {created_count} folder(s) successfully!")
+                st.session_state['input_text'] = ""  # Clear input
+                st.rerun()
+    
+    with col_portal:
+        if st.button("Photo Portal"):
+            st.session_state['page'] = 'Photo Portal'
+            st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+            reset_page_state('Photo Portal')
+            st.rerun()
     
     if st.session_state.get('page') != 'Stock Taking':
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state(st.session_state['page'])
         st.rerun()
+
+def photo_portal_list_page():
+    col1, col2 = st.columns([8, 1])
+    with col1:
+        st.title("Photo Portal - Empty Folders")
+    with col2:
+        st.button("Home", key="home_photo_list", on_click=go_home)
+    
+    if st.button("Refresh", key="refresh_empty"):
+        if 'empty_folders' in st.session_state:
+            del st.session_state['empty_folders']
+        st.rerun()
+    
+    if 'empty_folders' not in st.session_state:
+        with st.spinner("Scanning empty folders..."):
+            st.session_state['empty_folders'] = get_empty_folders()
+    
+    empty_folders = st.session_state['empty_folders']
+    
+    if not empty_folders:
+        st.info("No empty folders found. All stock folders have photos!")
+    else:
+        st.write(f"Found {len(empty_folders)} empty folder(s):")
+        for name, folder_id in empty_folders:
+            if st.button(name, key=f"folder_{folder_id}"):
+                st.session_state['selected_folder_name'] = name
+                st.session_state['selected_folder_id'] = folder_id
+                st.session_state['page'] = 'Photo Upload'
+                st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+                st.rerun()
+
+def photo_upload_page():
+    col1, col2 = st.columns([8, 1])
+    with col1:
+        st.title(f"Upload Photos: {st.session_state['selected_folder_name']}")
+    with col2:
+        st.button("Home", key="home_photo_upload", on_click=go_home)
+    
+    uploaded_files = st.file_uploader(
+        "Choose photos from your album",
+        type=['png', 'jpg', 'jpeg'],
+        accept_multiple_files=True,
+        key="photo_uploader"
+    )
+    
+    if uploaded_files:
+        if st.button("Upload Photos"):
+            if not uploaded_files:
+                st.error("No photos selected.")
+            else:
+                with st.spinner(f"Uploading {len(uploaded_files)} photo(s)..."):
+                    results = upload_photos_to_folder(st.session_state['selected_folder_id'], uploaded_files)
+                success_count = sum(1 for _, ok in results if ok)
+                fail_count = len(results) - success_count
+                st.session_state['upload_results'] = results
+                st.rerun()
+    
+    if 'upload_results' in st.session_state:
+        results = st.session_state['upload_results']
+        success_count = sum(1 for _, ok in results if ok)
+        if success_count > 0:
+            st.success(f"Uploaded {success_count} photo(s) successfully!")
+        if success_count < len(results):
+            st.error(f"{len(results) - success_count} failed.")
+            for name, msg in results:
+                if not isinstance(msg, bool):
+                    st.code(f"{name}: {msg}")
+        
+        if st.button("Back to List"):
+            st.session_state['page'] = 'Photo Portal'
+            st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+            reset_page_state('Photo Portal')
+            st.rerun()
 
 # === Main Router ===
 query_params = st.query_params.to_dict()
@@ -651,3 +751,7 @@ else:
         quick_responses_page()
     elif st.session_state['page'] == 'Stock Taking':
         stock_taking_page()
+    elif st.session_state['page'] == 'Photo Portal':
+        photo_portal_list_page()
+    elif st.session_state['page'] == 'Photo Upload':
+        photo_upload_page()
