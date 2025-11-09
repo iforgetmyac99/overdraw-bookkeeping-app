@@ -553,6 +553,26 @@ def stock_taking_page():
                     st.success(f"Created {created_count} folder(s) successfully!")
                 st.session_state['input_text'] = ""  # Clear input
                 st.rerun()
+
+    st.markdown("### Empty Folders")
+    if st.button("Refresh Empty Folders", key="refresh_empty_stock"):
+        if 'empty_folders' in st.session_state:
+            del st.session_state['empty_folders']
+        st.rerun()
+
+    if 'empty_folders' not in st.session_state:
+        with st.spinner("Scanning empty folders..."):
+            st.session_state['empty_folders'] = get_empty_folders()
+
+    empty_folders = st.session_state['empty_folders']
+
+    if not empty_folders:
+        st.info("No empty folders found. All stock folders have photos!")
+    else:
+        st.write(f"Found {len(empty_folders)} empty folder(s):")
+        for name, folder_id in empty_folders:
+            st.markdown(f"- {name}")
+
     
     with col_portal:
         if st.button("Photo Portal"):
@@ -566,35 +586,24 @@ def stock_taking_page():
         reset_page_state(st.session_state['page'])
         st.rerun()
 
-def photo_portal_list_page():
-    col1, col2 = st.columns([8, 1])
-    with col1:
-        st.title("Photo Portal - Empty Folders")
-    with col2:
-        st.button("Home", key="home_photo_list", on_click=go_home)
+
     
-    if st.button("Refresh", key="refresh_empty"):
-        if 'empty_folders' in st.session_state:
-            del st.session_state['empty_folders']
-        st.rerun()
-    
-    if 'empty_folders' not in st.session_state:
-        with st.spinner("Scanning empty folders..."):
-            st.session_state['empty_folders'] = get_empty_folders()
-    
-    empty_folders = st.session_state['empty_folders']
-    
-    if not empty_folders:
-        st.info("No empty folders found. All stock folders have photos!")
-    else:
-        st.write(f"Found {len(empty_folders)} empty folder(s):")
-        for name, folder_id in empty_folders:
-            if st.button(name, key=f"folder_{folder_id}"):
-                st.session_state['selected_folder_name'] = name
-                st.session_state['selected_folder_id'] = folder_id
-                st.session_state['page'] = 'Photo Upload'
-                st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-                st.rerun()
+    if 'upload_results' in st.session_state:
+        results = st.session_state['upload_results']
+        success_count = sum(1 for _, ok in results if ok)
+        if success_count > 0:
+            st.success(f"Uploaded {success_count} photo(s) successfully!")
+        if success_count < len(results):
+            st.error(f"{len(results) - success_count} failed.")
+            for name, msg in results:
+                if not isinstance(msg, bool):
+                    st.code(f"{name}: {msg}")
+        
+        if st.button("Back to List"):
+            st.session_state['page'] = 'Photo Portal'
+            st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+            reset_page_state('Photo Portal')
+            st.rerun()
 
 # === Main Router ===
 query_params = st.query_params.to_dict()
@@ -718,5 +727,7 @@ else:
         stock_taking_page()
     elif st.session_state['page'] == 'Photo Portal':
         photo_portal_list_page()
+    elif st.session_state['page'] == 'Photo Upload':
+        photo_upload_page()
 
 
