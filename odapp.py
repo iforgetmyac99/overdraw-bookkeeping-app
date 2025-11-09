@@ -553,35 +553,18 @@ def stock_taking_page():
                     st.success(f"Created {created_count} folder(s) successfully!")
                 st.session_state['input_text'] = ""  # Clear input
                 st.rerun()
-
-        # Display empty folders below
-        if 'empty_folders' not in st.session_state:
-            with st.spinner("Scanning empty folders..."):
-                st.session_state['empty_folders'] = get_empty_folders()
-        empty_folders = st.session_state['empty_folders']
-        if not empty_folders:
-            st.info("No empty folders found. All stock folders have photos!")
-        else:
-            st.write(f"Found {len(empty_folders)} empty folder(s):")
-            for name, folder_id in empty_folders:
-                st.button(name, key=f"folder_{folder_id}")  # No action yet
+    
+    with col_portal:
+        if st.button("Photo Portal"):
+            st.session_state['page'] = 'Photo Portal'
+            st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+            reset_page_state('Photo Portal')
+            st.rerun()
     
     if st.session_state.get('page') != 'Stock Taking':
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state(st.session_state['page'])
         st.rerun()
-
-        # Display empty folders below
-        if 'empty_folders' not in st.session_state:
-            with st.spinner("Scanning empty folders..."):
-                st.session_state['empty_folders'] = get_empty_folders()
-        empty_folders = st.session_state['empty_folders']
-        if not empty_folders:
-            st.info("No empty folders found. All stock folders have photos!")
-        else:
-            st.write(f"Found {len(empty_folders)} empty folder(s):")
-            for name, folder_id in empty_folders:
-                st.button(name, key=f"folder_{folder_id}")  # No action yet
 
 def photo_portal_list_page():
     col1, col2 = st.columns([8, 1])
@@ -594,18 +577,6 @@ def photo_portal_list_page():
         if 'empty_folders' in st.session_state:
             del st.session_state['empty_folders']
         st.rerun()
-
-        # Display empty folders below
-        if 'empty_folders' not in st.session_state:
-            with st.spinner("Scanning empty folders..."):
-                st.session_state['empty_folders'] = get_empty_folders()
-        empty_folders = st.session_state['empty_folders']
-        if not empty_folders:
-            st.info("No empty folders found. All stock folders have photos!")
-        else:
-            st.write(f"Found {len(empty_folders)} empty folder(s):")
-            for name, folder_id in empty_folders:
-                st.button(name, key=f"folder_{folder_id}")  # No action yet
     
     if 'empty_folders' not in st.session_state:
         with st.spinner("Scanning empty folders..."):
@@ -624,18 +595,6 @@ def photo_portal_list_page():
                 st.session_state['page'] = 'Photo Upload'
                 st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
                 st.rerun()
-
-        # Display empty folders below
-        if 'empty_folders' not in st.session_state:
-            with st.spinner("Scanning empty folders..."):
-                st.session_state['empty_folders'] = get_empty_folders()
-        empty_folders = st.session_state['empty_folders']
-        if not empty_folders:
-            st.info("No empty folders found. All stock folders have photos!")
-        else:
-            st.write(f"Found {len(empty_folders)} empty folder(s):")
-            for name, folder_id in empty_folders:
-                st.button(name, key=f"folder_{folder_id}")  # No action yet
 
 def photo_upload_page():
     col1, col2 = st.columns([8, 1])
@@ -662,18 +621,6 @@ def photo_upload_page():
                 fail_count = len(results) - success_count
                 st.session_state['upload_results'] = results
                 st.rerun()
-
-        # Display empty folders below
-        if 'empty_folders' not in st.session_state:
-            with st.spinner("Scanning empty folders..."):
-                st.session_state['empty_folders'] = get_empty_folders()
-        empty_folders = st.session_state['empty_folders']
-        if not empty_folders:
-            st.info("No empty folders found. All stock folders have photos!")
-        else:
-            st.write(f"Found {len(empty_folders)} empty folder(s):")
-            for name, folder_id in empty_folders:
-                st.button(name, key=f"folder_{folder_id}")  # No action yet
     
     if 'upload_results' in st.session_state:
         results = st.session_state['upload_results']
@@ -691,18 +638,6 @@ def photo_upload_page():
             st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
             reset_page_state('Photo Portal')
             st.rerun()
-
-        # Display empty folders below
-        if 'empty_folders' not in st.session_state:
-            with st.spinner("Scanning empty folders..."):
-                st.session_state['empty_folders'] = get_empty_folders()
-        empty_folders = st.session_state['empty_folders']
-        if not empty_folders:
-            st.info("No empty folders found. All stock folders have photos!")
-        else:
-            st.write(f"Found {len(empty_folders)} empty folder(s):")
-            for name, folder_id in empty_folders:
-                st.button(name, key=f"folder_{folder_id}")  # No action yet
 
 # === Main Router ===
 query_params = st.query_params.to_dict()
@@ -723,18 +658,6 @@ else:
         st.query_params.clear()
         reset_page_state('Login')
         st.rerun()
-
-        # Display empty folders below
-        if 'empty_folders' not in st.session_state:
-            with st.spinner("Scanning empty folders..."):
-                st.session_state['empty_folders'] = get_empty_folders()
-        empty_folders = st.session_state['empty_folders']
-        if not empty_folders:
-            st.info("No empty folders found. All stock folders have photos!")
-        else:
-            st.write(f"Found {len(empty_folders)} empty folder(s):")
-            for name, folder_id in empty_folders:
-                st.button(name, key=f"folder_{folder_id}")  # No action yet
     st.session_state['last_activity'] = current_time
     if 'page' not in st.session_state:
         st.session_state['page'] = 'Home'
@@ -777,33 +700,9 @@ else:
                         st.session_state['show_button'] = False
                         st.session_state['input_text'] = ""
                         st.rerun()
-
-        # Display empty folders below
-        if 'empty_folders' not in st.session_state:
-            with st.spinner("Scanning empty folders..."):
-                st.session_state['empty_folders'] = get_empty_folders()
-        empty_folders = st.session_state['empty_folders']
-        if not empty_folders:
-            st.info("No empty folders found. All stock folders have photos!")
-        else:
-            st.write(f"Found {len(empty_folders)} empty folder(s):")
-            for name, folder_id in empty_folders:
-                st.button(name, key=f"folder_{folder_id}")  # No action yet
                     else:
                         st.session_state['error'] = result
                         st.rerun()
-
-        # Display empty folders below
-        if 'empty_folders' not in st.session_state:
-            with st.spinner("Scanning empty folders..."):
-                st.session_state['empty_folders'] = get_empty_folders()
-        empty_folders = st.session_state['empty_folders']
-        if not empty_folders:
-            st.info("No empty folders found. All stock folders have photos!")
-        else:
-            st.write(f"Found {len(empty_folders)} empty folder(s):")
-            for name, folder_id in empty_folders:
-                st.button(name, key=f"folder_{folder_id}")  # No action yet
                 else:
                     st.error("Couldn't extract all required data. Check template.")
             else:
@@ -856,18 +755,6 @@ else:
             st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
             reset_page_state(st.session_state['page'])
             st.rerun()
-
-        # Display empty folders below
-        if 'empty_folders' not in st.session_state:
-            with st.spinner("Scanning empty folders..."):
-                st.session_state['empty_folders'] = get_empty_folders()
-        empty_folders = st.session_state['empty_folders']
-        if not empty_folders:
-            st.info("No empty folders found. All stock folders have photos!")
-        else:
-            st.write(f"Found {len(empty_folders)} empty folder(s):")
-            for name, folder_id in empty_folders:
-                st.button(name, key=f"folder_{folder_id}")  # No action yet
     elif st.session_state['page'] == 'Quick Responses':
         quick_responses_page()
     elif st.session_state['page'] == 'Stock Taking':
