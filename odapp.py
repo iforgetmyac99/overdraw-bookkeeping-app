@@ -1,6 +1,7 @@
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 import pandas as pd
 import re
 from datetime import datetime
@@ -11,6 +12,26 @@ def load_gspread():
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
     return gspread.authorize(creds).open_by_key('10CLEJyH7LGkZrVjc8EiicJ2PCBY_se7gALChd_YyaCg').sheet1
+
+@st.cache_resource
+def get_drive_service():
+    scope = ['https://www.googleapis.com/auth/drive']
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+    return build('drive', 'v3', credentials=creds)
+
+def create_drive_folder(shoe_name):
+    service = get_drive_service()
+    root_id = st.secrets["drive"]["root_folder_id"]
+    folder_metadata = {
+        'name': shoe_name.strip(),
+        'mimeType': 'application/vnd.google-apps.folder',
+        'parents': [root_id]
+    }
+    try:
+        folder = service.files().create(body=folder_metadata, fields='id, webViewLink').execute()
+        return folder.get('webViewLink')
+    except Exception as e:
+        return str(e)
 
 def reset_page_state(page):
     state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang', 'quick_response_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger']
@@ -25,6 +46,8 @@ def reset_page_state(page):
         st.session_state['search_query'] = ""
     elif page == 'Quick Responses':
         st.session_state['quick_response_lang'] = None
+    elif page == 'Stock Taking':
+        pass
     st.session_state['last_page'] = page
 
 def go_home():
@@ -181,8 +204,8 @@ def quick_responses_page():
     st.markdown('</div>', unsafe_allow_html=True)
     if st.session_state['quick_response_lang'] == 'zh':
         st.markdown('<div class="item-container"><p class="item-label">快速落單</p>', unsafe_allow_html=True)
-        express_order_zh = """快速落單💨
-㩒一㩒「出價」同埋留低以下資料就可以快速落單㗎喇🤝🏻
+        express_order_zh = """快速落單
+一按「出價」同埋留低以下資料就可以快速落單喇
 鞋款：
 顏色：
 碼數：
@@ -190,10 +213,10 @@ def quick_responses_page():
 電話：
 地址：
 付款方式（FPS / Payme / Alipay）：
-溫馨提示🥰
-貨品如非質量問題 不設退換👟
-收貨後請先作檢查✅
-已經穿著嘅鞋將不接受退換處理🚫"""
+溫馨提示
+貨品如非質量問題 不設退換
+收貨後請先作檢查
+已經穿著嘅鞋將不接受退換處理"""
         st.text_area("", value=express_order_zh, height=200, disabled=True, key="express_order_zh")
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('<div class="item-container"><p class="item-label">付款方法</p>', unsafe_allow_html=True)
@@ -210,13 +233,13 @@ https://payme.hsbc/overdraw9"""
 大約五至七日左右到貨
 寄出後會有順豐寄件編號比翻你嘅
 到時可以用順豐APP查詢寄件狀況
-多謝支持🫡"""
+多謝支持"""
         st.text_area("", value=completed_order_zh, height=150, disabled=True, key="completed_order_zh")
         st.markdown('</div>', unsafe_allow_html=True)
     elif st.session_state['quick_response_lang'] == 'en':
         st.markdown('<div class="item-container"><p class="item-label">Express Order</p>', unsafe_allow_html=True)
-        express_order_en = """Express Order💨
-Please fill in the information below and click "Make Offer" button for placing order🤝🏻
+        express_order_en = """Express Order
+Please fill in the information below and click "Make Offer" button for placing order
 Shoe:
 Color:
 Size:
@@ -224,10 +247,10 @@ Name:
 Phone:
 Address:
 Payment (FPS/Alipay/Payme):
-Warm Reminder🥰
-Refund / Exchange is only facilitated for shoes with quality issue👟
-Please check when receiving the delivery✅
-Worn shoes are not accepted as return🚫"""
+Warm Reminder
+Refund / Exchange is only facilitated for shoes with quality issue
+Please check when receiving the delivery
+Worn shoes are not accepted as return"""
         st.text_area("", value=express_order_en, height=200, disabled=True, key="express_order_en")
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('<div class="item-container"><p class="item-label">Payment Method</p>', unsafe_allow_html=True)
@@ -283,6 +306,11 @@ def home_page():
         st.session_state['page'] = 'Quick Responses'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Quick Responses')
+        st.rerun()
+    if st.button("Stock Taking"):
+        st.session_state['page'] = 'Stock Taking'
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('Stock Taking')
         st.rerun()
 
 @st.cache_data(show_spinner=False)
@@ -409,12 +437,12 @@ def order_details_page():
         else:
             st.error("Please enter a delivery number.")
     if 'success' in st.session_state:
-        st.success("SF Delivery Number updated successfully!", icon="✅")
+        st.success("SF Delivery Number updated successfully!", icon="Checkmark")
         if 'message_lang' not in st.session_state:
             st.session_state['message_lang'] = 'en'
         st.markdown('<div class="item-container"><p class="item-label">Delivery Message:</p>', unsafe_allow_html=True)
         if st.session_state['message_lang'] == 'zh':
-            message = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持🫡"
+            message = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持"
             st.text_area("", value=message, height=100, disabled=True, key="message_chinese")
         else:
             message = f"SF Delivery Number: {st.session_state['sf_delivery']}\nHello shoes are sent. Please leave a 5 star review when receiving the product. Have a nice day."
@@ -439,6 +467,34 @@ def order_details_page():
             else:
                 st.error("Failed to update order status.")
     if st.session_state.get('page') != 'Order Details':
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state(st.session_state['page'])
+        st.rerun()
+
+def stock_taking_page():
+    col1, col2 = st.columns([8, 1])
+    with col1:
+        st.title("Stock Taking")
+    with col2:
+        st.button("Home", key="home_stock", on_click=go_home)
+    st.markdown("""
+    <style>
+    .stTextInput, .stTextArea { width: 100% !important; }
+    </style>
+    """, unsafe_allow_html=True)
+    shoe_name = st.text_input("Enter shoe name to create stock folder", key="stock_shoe_input")
+    if st.button("Create Folder", key="create_folder_btn"):
+        if shoe_name.strip():
+            with st.spinner("Creating folder in Google Drive..."):
+                link = create_drive_folder(shoe_name)
+            if "drive.google.com" in link:
+                st.success(f"Folder created: [{shoe_name}]({link})")
+                st.code(link, language=None)
+            else:
+                st.error(f"Failed: {link}")
+        else:
+            st.error("Enter a shoe name.")
+    if st.session_state.get('page') != 'Stock Taking':
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state(st.session_state['page'])
         st.rerun()
@@ -509,7 +565,7 @@ else:
             else:
                 st.error("Enter template text.")
         if 'success' in st.session_state:
-            st.success("Entry added successfully!", icon="✅")
+            st.success("Entry added successfully!", icon="Checkmark")
             st.button("Add Another Entry", on_click=clear_template_input)
         elif 'error' in st.session_state:
             st.error(f"Failed to add entry: {st.session_state['error']}")
@@ -558,3 +614,5 @@ else:
             st.rerun()
     elif st.session_state['page'] == 'Quick Responses':
         quick_responses_page()
+    elif st.session_state['page'] == 'Stock Taking':
+        stock_taking_page()
