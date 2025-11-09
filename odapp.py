@@ -61,13 +61,10 @@ def upload_photos_to_folder(folder_id, files):
     service = get_drive_service()
     results = []
     for file in files:
+        file_stream = io.BytesIO(file.getvalue())
+        media = MediaIoBaseUpload(file_stream, mimetype=file.type)
+        file_metadata = {'name': file.name, 'parents': [folder_id]}
         try:
-            file_stream = io.BytesIO(file.read())  # Correct way to read file
-            media = MediaIoBaseUpload(file_stream, mimetype=file.type, resumable=True)
-            file_metadata = {
-                'name': file.name,
-                'parents': [folder_id]
-            }
             uploaded = service.files().create(
                 body=file_metadata,
                 media_body=media,
@@ -558,10 +555,7 @@ def stock_taking_page():
                 st.rerun()
     
     with col_portal:
-        if st.button("Photo Portal"):
-            st.session_state['page'] = 'Photo Portal'
             st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-            reset_page_state('Photo Portal')
             st.rerun()
     
     if st.session_state.get('page') != 'Stock Taking':
@@ -569,13 +563,6 @@ def stock_taking_page():
         reset_page_state(st.session_state['page'])
         st.rerun()
 
-def photo_portal_list_page():
-    col1, col2 = st.columns([8, 1])
-    with col1:
-        st.title("Photo Portal - Empty Folders")
-    with col2:
-        st.button("Home", key="home_photo_list", on_click=go_home)
-    
     if st.button("Refresh", key="refresh_empty"):
         if 'empty_folders' in st.session_state:
             del st.session_state['empty_folders']
@@ -595,17 +582,9 @@ def photo_portal_list_page():
             if st.button(name, key=f"folder_{folder_id}"):
                 st.session_state['selected_folder_name'] = name
                 st.session_state['selected_folder_id'] = folder_id
-                st.session_state['page'] = 'Photo Upload'
                 st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
                 st.rerun()
 
-def photo_upload_page():
-    col1, col2 = st.columns([8, 1])
-    with col1:
-        st.title(f"Upload Photos: {st.session_state['selected_folder_name']}")
-    with col2:
-        st.button("Home", key="home_photo_upload", on_click=go_home)
-    
     uploaded_files = st.file_uploader(
         "Choose photos from your album",
         type=['png', 'jpg', 'jpeg'],
@@ -637,9 +616,7 @@ def photo_upload_page():
                     st.code(f"{name}: {msg}")
         
         if st.button("Back to List"):
-            st.session_state['page'] = 'Photo Portal'
             st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-            reset_page_state('Photo Portal')
             st.rerun()
 
 # === Main Router ===
@@ -762,9 +739,3 @@ else:
         quick_responses_page()
     elif st.session_state['page'] == 'Stock Taking':
         stock_taking_page()
-    elif st.session_state['page'] == 'Photo Portal':
-        photo_portal_list_page()
-    elif st.session_state['page'] == 'Photo Upload':
-        photo_upload_page()
-
-
