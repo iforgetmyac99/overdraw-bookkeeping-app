@@ -763,3 +763,5 @@ else:
         photo_portal_list_page()
     elif st.session_state['page'] == 'Photo Upload':
         photo_upload_page()
+
+
