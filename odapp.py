@@ -552,21 +552,21 @@ def stock_taking_page():
                 if created_count > 0:
                     st.success(f"Created {created_count} folder(s) successfully!")
                 st.session_state['input_text'] = ""  # Clear input
-                st.rerun()
     
     with col_portal:
+        if st.button("Photo Portal"):
+            st.session_state['page'] = 'Photo Portal'
             st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-            st.rerun()
+            reset_page_state('Photo Portal')
     
     if st.session_state.get('page') != 'Stock Taking':
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state(st.session_state['page'])
-        st.rerun()
 
+    
     if st.button("Refresh", key="refresh_empty"):
         if 'empty_folders' in st.session_state:
             del st.session_state['empty_folders']
-        st.rerun()
     
     if 'empty_folders' not in st.session_state:
         with st.spinner("Scanning empty folders..."):
@@ -582,9 +582,10 @@ def stock_taking_page():
             if st.button(name, key=f"folder_{folder_id}"):
                 st.session_state['selected_folder_name'] = name
                 st.session_state['selected_folder_id'] = folder_id
+                st.session_state['page'] = 'Photo Upload'
                 st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-                st.rerun()
 
+    
     uploaded_files = st.file_uploader(
         "Choose photos from your album",
         type=['png', 'jpg', 'jpeg'],
@@ -602,7 +603,6 @@ def stock_taking_page():
                 success_count = sum(1 for _, ok in results if ok)
                 fail_count = len(results) - success_count
                 st.session_state['upload_results'] = results
-                st.rerun()
     
     if 'upload_results' in st.session_state:
         results = st.session_state['upload_results']
@@ -616,8 +616,9 @@ def stock_taking_page():
                     st.code(f"{name}: {msg}")
         
         if st.button("Back to List"):
+            st.session_state['page'] = 'Photo Portal'
             st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-            st.rerun()
+            reset_page_state('Photo Portal')
 
 # === Main Router ===
 query_params = st.query_params.to_dict()
@@ -637,7 +638,6 @@ else:
             del st.session_state['page']
         st.query_params.clear()
         reset_page_state('Login')
-        st.rerun()
     st.session_state['last_activity'] = current_time
     if 'page' not in st.session_state:
         st.session_state['page'] = 'Home'
@@ -679,10 +679,8 @@ else:
                         st.session_state['success'] = True
                         st.session_state['show_button'] = False
                         st.session_state['input_text'] = ""
-                        st.rerun()
                     else:
                         st.session_state['error'] = result
-                        st.rerun()
                 else:
                     st.error("Couldn't extract all required data. Check template.")
             else:
@@ -734,10 +732,7 @@ else:
         if st.session_state.get('page') != 'Record Checking':
             st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
             reset_page_state(st.session_state['page'])
-            st.rerun()
     elif st.session_state['page'] == 'Quick Responses':
         quick_responses_page()
     elif st.session_state['page'] == 'Stock Taking':
         stock_taking_page()
-
-
