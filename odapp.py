@@ -602,26 +602,24 @@ def photo_upload_page():
         st.title(f"Upload Photos: {st.session_state['selected_folder_name']}")
     with col2:
         st.button("Home", key="home_photo_upload", on_click=go_home)
-    
+
     uploaded_files = st.file_uploader(
         "Choose photos from your album",
         type=['png', 'jpg', 'jpeg'],
         accept_multiple_files=True,
         key="photo_uploader"
     )
-    
+
     if uploaded_files:
+        st.image(uploaded_files[0], width=200)  # Thumbnail preview
         if st.button("Upload Photos"):
-            if not uploaded_files:
-                st.error("No photos selected.")
-            else:
-                with st.spinner(f"Uploading {len(uploaded_files)} photo(s)..."):
-                    results = upload_photos_to_folder(st.session_state['selected_folder_id'], uploaded_files)
-                success_count = sum(1 for _, ok in results if ok)
-                fail_count = len(results) - success_count
+            with st.spinner(f"Uploading {len(uploaded_files)} photo(s)..."):
+                results = upload_photos_to_folder(st.session_state['selected_folder_id'], uploaded_files)
                 st.session_state['upload_results'] = results
+                if 'empty_folders' in st.session_state:
+                    del st.session_state['empty_folders']
                 st.rerun()
-    
+
     if 'upload_results' in st.session_state:
         results = st.session_state['upload_results']
         success_count = sum(1 for _, ok in results if ok)
@@ -629,14 +627,41 @@ def photo_upload_page():
             st.success(f"Uploaded {success_count} photo(s) successfully!")
         if success_count < len(results):
             st.error(f"{len(results) - success_count} failed.")
-            for name, msg in results:
-                if not isinstance(msg, bool):
-                    st.code(f"{name}: {msg}")
-        
+        for name, msg in results:
+            if not isinstance(msg, bool):
+                st.code(f"{name}: {msg}")
+
+        if st.button("Mark as Complete"):
+            try:
+                service = get_drive_service()
+                root_id = st.secrets["drive"]["root_folder_id"]
+                query = f"'{root_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = 'Completed' and trashed = false"
+                results = service.files().list(q=query, fields="files(id)").execute()
+                folders = results.get('files', [])
+                if folders:
+                    completed_id = folders[0]['id']
+                else:
+                    folder_metadata = {
+                        'name': 'Completed',
+                        'mimeType': 'application/vnd.google-apps.folder',
+                        'parents': [root_id]
+                    }
+                    folder = service.files().create(body=folder_metadata, fields='id').execute()
+                    completed_id = folder['id']
+                service.files().update(
+                    fileId=st.session_state['selected_folder_id'],
+                    addParents=completed_id,
+                    removeParents=root_id,
+                    fields='id, parents'
+                ).execute()
+                st.success("Folder marked as complete and moved to Completed folder.")
+            except Exception as e:
+                st.error(f"Failed to move folder: {e}")
+
         if st.button("Back to List"):
+            if 'empty_folders' in st.session_state:
+                del st.session_state['empty_folders']
             st.session_state['page'] = 'Photo Portal'
-            st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-            reset_page_state('Photo Portal')
             st.rerun()
 
 # === Main Router ===
@@ -763,5 +788,6 @@ else:
         photo_portal_list_page()
     elif st.session_state['page'] == 'Photo Upload':
         photo_upload_page()
+
 
 
