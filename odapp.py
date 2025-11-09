@@ -487,18 +487,45 @@ def stock_taking_page():
     .stTextInput, .stTextArea { width: 100% !important; }
     </style>
     """, unsafe_allow_html=True)
-    shoe_name = st.text_input("Enter shoe name to create stock folder", key="stock_shoe_input")
-    if st.button("Create Folder", key="create_folder_btn"):
-        if shoe_name.strip():
-            with st.spinner("Creating folder in Google Drive..."):
-                link = create_drive_folder(shoe_name)
-            if "drive.google.com" in link:
-                st.success(f"Folder created: [{shoe_name}]({link})")
-                st.code(link, language=None)
-            else:
-                st.error(f"Failed: {link}")
-        else:
-            st.error("Enter a shoe name.")
+    
+    shoe_input = st.text_area(
+        "Enter shoe names (one per line)", 
+        placeholder="Nike Air Force 1\nAdidas Ultraboost\nJordan 1\nPuma RS-X",
+        height=150,
+        key="stock_shoe_input"
+    )
+    
+    if st.button("Create Folders", key="create_folder_btn"):
+        lines = [line.strip() for line in shoe_input.splitlines() if line.strip()]
+        if not lines:
+            st.error("Enter at least one shoe name.")
+            return
+        
+        results = []
+        with st.spinner(f"Creating {len(lines)} folder(s) in Google Drive..."):
+            for name in lines:
+                link = create_drive_folder(name)
+                if "drive.google.com" in link:
+                    results.append((name, link, True))
+                else:
+                    results.append((name, link, False))
+        
+        # Show results
+        success_count = sum(1 for _, _, ok in results if ok)
+        fail_count = len(results) - success_count
+        
+        if success_count > 0:
+            st.success(f"Created {success_count} folder(s) successfully!")
+            for name, link, ok in results:
+                if ok:
+                    st.markdown(f"**{name}** → [{link}]({link})")
+        
+        if fail_count > 0:
+            st.error(f"{fail_count} folder(s) failed:")
+            for name, link, ok in results:
+                if not ok:
+                    st.code(f"{name}: {link}")
+    
     if st.session_state.get('page') != 'Stock Taking':
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state(st.session_state['page'])
