@@ -18,7 +18,10 @@ def load_gspread():
 
 @st.cache_resource
 def get_drive_service():
-    scope = ['https://www.googleapis.com/auth/drive']
+    scope = [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive.file'  # Allows file creation in shared folders
+    ]
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
     return build('drive', 'v3', credentials=creds)
 
@@ -755,3 +758,4 @@ else:
         photo_portal_list_page()
     elif st.session_state['page'] == 'Photo Upload':
         photo_upload_page()
+
