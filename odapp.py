@@ -93,7 +93,8 @@ def update_cost(stock_id, cost):
 
 def reset_page_state(page):
     state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang',
-                  'quick_response_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger']
+                  'quick_response_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger',
+                  'stock_shoe_input', 'stock_created']
     for key in state_keys:
         if key in st.session_state:
             del st.session_state[key]
@@ -476,43 +477,46 @@ def stock_taking_page():
                 start_id = add_stock_rows(lines)
             if start_id:
                 st.success(f"Created {created_count} folder(s) and added {len(lines)} items to Stock (ID {start_id}–{start_id + len(lines) - 1}).")
+                st.session_state['stock_created'] = True
             else:
                 st.error("Failed to add to Stock sheet.")
-            st.session_state.stock_shoe_input = ""
+            st.session_state['stock_shoe_input'] = ""
             get_empty_folders.clear()
             st.rerun()
 
-    st.markdown("### Enter Cost for New Stock")
-    try:
-        sh = load_gspread().worksheet("Stock")
-        data = sh.get_all_records()
-        df = pd.DataFrame(data)
-        pending_cost = df[df['Cost'].isnull() | (df['Cost'] == "")].sort_values("Stock ID", ascending=False)
-        if not pending_cost.empty:
-            for _, row in pending_cost.iterrows():
-                sid = row['Stock ID']
-                product = row['Product']
-                col_id, col_name, col_input = st.columns([1, 5, 2])
-                with col_id:
-                    st.markdown(f"**ID: {sid}**")
-                with col_name:
-                    st.markdown(f"**{product}**")
-                with col_input:
-                    cost_key = f"cost_input_{sid}"
-                    cost_val = st.text_input("", placeholder="Enter cost", key=cost_key, label_visibility="collapsed")
-                    if st.button("Submit", key=f"submit_cost_{sid}"):
-                        if cost_val.strip():
-                            if update_cost(sid, cost_val.strip()):
-                                st.success(f"Cost saved for ID {sid}")
-                                st.rerun()
+    # Show cost module only after creation
+    if st.session_state.get('stock_created'):
+        st.markdown("### Enter Cost for New Stock")
+        try:
+            sh = load_gspread().worksheet("Stock")
+            data = sh.get_all_records()
+            df = pd.DataFrame(data)
+            pending_cost = df[df['Cost'].isnull() | (df['Cost'] == "")].sort_values("Stock ID", ascending=False)
+            if not pending_cost.empty:
+                for _, row in pending_cost.iterrows():
+                    sid = row['Stock ID']
+                    product = row['Product']
+                    col_id, col_name, col_input = st.columns([1, 5, 2])
+                    with col_id:
+                        st.markdown(f"**ID: {sid}**")
+                    with col_name:
+                        st.markdown(f"**{product}**")
+                    with col_input:
+                        cost_key = f"cost_input_{sid}"
+                        cost_val = st.text_input("", placeholder="Enter cost", key=cost_key, label_visibility="collapsed")
+                        if st.button("Submit", key=f"submit_cost_{sid}"):
+                            if cost_val.strip():
+                                if update_cost(sid, cost_val.strip()):
+                                    st.success(f"Cost saved for ID {sid}")
+                                    st.rerun()
+                                else:
+                                    st.error("Update failed.")
                             else:
-                                st.error("Update failed.")
-                        else:
-                            st.error("Enter a cost.")
-        else:
-            st.info("No items awaiting cost entry.")
-    except Exception as e:
-        st.error(f"Error loading Stock sheet: {e}")
+                                st.error("Enter a cost.")
+            else:
+                st.info("No items awaiting cost entry.")
+        except Exception as e:
+            st.error(f"Error loading Stock sheet: {e}")
 
     st.markdown("### Empty Folders")
     if st.button("Refresh", key="refresh_empty_stock"):
