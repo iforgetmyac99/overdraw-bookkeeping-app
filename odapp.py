@@ -421,7 +421,7 @@ def go_pending():
     reset_page_state('Pending Orders')
     st.rerun()
 
-        if st.button(f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})", key=f"order_{row['Order']}"):
+def order_details_page():
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("Order Details")
