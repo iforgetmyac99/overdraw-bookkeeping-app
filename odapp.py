@@ -471,7 +471,6 @@ def stock_taking_page():
 
     input_text = st.text_area(
         "Enter stock items (one per line: Shoe Name → Cost)", 
-        placeholder="Nike Air Force 1\n1200\nAdidas Ultraboost\n980",
         height=200,
         key="stock_input"
     )
@@ -503,7 +502,16 @@ def stock_taking_page():
                 try:
                     date = datetime.now().strftime("%d/%m/%Y")
                     sheet.append_row([
-                        "", date, "", shoe_name, "", "", "Stock", "", "", cost
+                        "",           # Order
+                        date,         # Date
+                        "",           # Carousell ID
+                        shoe_name,    # Item
+                        "",           # Color
+                        "",           # Size
+                        "Stock",      # Status
+                        "",           # Phone
+                        "",           # Address
+                        cost          # SF Delivery Number → used as Cost
                     ])
                     success_count += 1
                 except Exception as e:
