@@ -2,7 +2,6 @@
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
 import pandas as pd
 import re
 from datetime import datetime
@@ -15,8 +14,7 @@ def load_gspread():
     return gspread.authorize(creds).open_by_key('10CLEJyH7LGkZrVjc8EiicJ2PCBY_se7gALChd_YyaCg').sheet1
 
 def reset_page_state(page):
-    state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang',
-                  'quick_response_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger']
+    state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang', 'quick_response_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger']
     for key in state_keys:
         if key in st.session_state:
             del st.session_state[key]
@@ -52,6 +50,7 @@ def login_page():
     </style>
     """, unsafe_allow_html=True)
     st.markdown('<h1 class="login-title">OverDraw Management Portal</h1>', unsafe_allow_html=True)
+   
     with st.form("login_form", clear_on_submit=True):
         username = st.text_input("Account")
         password = st.text_input("Password", type="password")
@@ -82,8 +81,11 @@ def extract_data(template_text):
     else:
         order_num = "OD001"
     date = datetime.now().strftime("%d/%m/%Y")
-    item = color = size = name = phone = address = ""
+    item = ""
+    color = ""
+    size = ""
     status = "Pending"
+    name = ""
     sf_delivery_number = ""
     item_en = re.search(r'Shoe:\s*([^\n]+)', template_text)
     color_en = re.search(r'Color:\s*([^\n]+)', template_text)
@@ -151,6 +153,7 @@ def quick_responses_page():
         st.title("Quick Responses")
     with col2:
         st.button("Home", key="home_button_quick", on_click=go_home)
+   
     st.markdown("""
     <style>
     .stTextInput, .stTextArea { width: 100% !important; }
@@ -169,8 +172,10 @@ def quick_responses_page():
     });
     </script>
     """, unsafe_allow_html=True)
+    # Language toggle buttons
     if 'quick_response_lang' not in st.session_state:
         st.session_state['quick_response_lang'] = None
+   
     st.markdown('<div class="button-container">', unsafe_allow_html=True)
     col1, col2 = st.columns([1, 1])
     with col1:
@@ -182,10 +187,12 @@ def quick_responses_page():
             st.session_state['quick_response_lang'] = 'en'
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
+    # Show responses only if a language is selected
     if st.session_state['quick_response_lang'] == 'zh':
+        # 快速落單
         st.markdown('<div class="item-container"><p class="item-label">快速落單</p>', unsafe_allow_html=True)
-        express_order_zh = """快速落單
-一按「出價」同埋留低以下資料就可以快速落單喇
+        express_order_zh = """快速落單💨
+㩒一㩒「出價」同埋留低以下資料就可以快速落單㗎喇🤝🏻
 鞋款：
 顏色：
 碼數：
@@ -193,12 +200,13 @@ def quick_responses_page():
 電話：
 地址：
 付款方式（FPS / Payme / Alipay）：
-溫馨提示
-貨品如非質量問題 不設退換
-收貨後請先作檢查
-已經穿著嘅鞋將不接受退換處理"""
+溫馨提示🥰
+貨品如非質量問題 不設退換👟
+收貨後請先作檢查✅
+已經穿著嘅鞋將不接受退換處理🚫"""
         st.text_area("", value=express_order_zh, height=200, disabled=True, key="express_order_zh")
         st.markdown('</div>', unsafe_allow_html=True)
+        # 付款方法
         st.markdown('<div class="item-container"><p class="item-label">付款方法</p>', unsafe_allow_html=True)
         payment_method = """FPS ID
 111780946
@@ -208,18 +216,20 @@ Tap to PayMe!
 https://payme.hsbc/overdraw9"""
         st.text_area("", value=payment_method, height=150, disabled=True, key="payment_method_zh")
         st.markdown('</div>', unsafe_allow_html=True)
+        # 落單成功
         st.markdown('<div class="item-container"><p class="item-label">落單成功</p>', unsafe_allow_html=True)
         completed_order_zh = """唔該曬
 大約五至七日左右到貨
 寄出後會有順豐寄件編號比翻你嘅
 到時可以用順豐APP查詢寄件狀況
-多謝支持"""
+多謝支持🫡"""
         st.text_area("", value=completed_order_zh, height=150, disabled=True, key="completed_order_zh")
         st.markdown('</div>', unsafe_allow_html=True)
     elif st.session_state['quick_response_lang'] == 'en':
+        # Express Order
         st.markdown('<div class="item-container"><p class="item-label">Express Order</p>', unsafe_allow_html=True)
-        express_order_en = """Express Order
-Please fill in the information below and click "Make Offer" button for placing order
+        express_order_en = """Express Order💨
+Please fill in the information below and click "Make Offer" button for placing order🤝🏻
 Shoe:
 Color:
 Size:
@@ -227,12 +237,13 @@ Name:
 Phone:
 Address:
 Payment (FPS/Alipay/Payme):
-Warm Reminder
-Refund / Exchange is only facilitated for shoes with quality issue
-Please check when receiving the delivery
-Worn shoes are not accepted as return"""
+Warm Reminder🥰
+Refund / Exchange is only facilitated for shoes with quality issue👟
+Please check when receiving the delivery✅
+Worn shoes are not accepted as return🚫"""
         st.text_area("", value=express_order_en, height=200, disabled=True, key="express_order_en")
         st.markdown('</div>', unsafe_allow_html=True)
+        # Payment Method
         st.markdown('<div class="item-container"><p class="item-label">Payment Method</p>', unsafe_allow_html=True)
         payment_method = """FPS ID
 111780946
@@ -242,6 +253,7 @@ Tap to PayMe!
 https://payme.hsbc/overdraw9"""
         st.text_area("", value=payment_method, height=150, disabled=True, key="payment_method_en")
         st.markdown('</div>', unsafe_allow_html=True)
+        # Completed Order
         st.markdown('<div class="item-container"><p class="item-label">Completed Order</p>', unsafe_allow_html=True)
         completed_order_en = """Well received and Thank you for the order!
 Pre-Ordered shoes take around 5 - 7 days for stock arrival.
@@ -250,54 +262,54 @@ Delivery status can be checked with the provided SF Delivery number.
 Thank you for your support and patience."""
         st.text_area("", value=completed_order_en, height=150, disabled=True, key="completed_order_en")
         st.markdown('</div>', unsafe_allow_html=True)
+    # Handle navigation
     if st.session_state.get('page') != 'Quick Responses':
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state(st.session_state['page'])
         st.rerun()
 
+# === CLEAR INPUT ===
 def clear_template_input():
     if 'success' in st.session_state:
         del st.session_state['success']
     st.session_state['show_button'] = True
     st.session_state['input_text'] = ""
 
+# === HOME PAGE ===
 def home_page():
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("Home Page")
     with col2:
         st.button("Home", disabled=True, key="home_button_home")
-
+   
     if st.button("Book Keeping"):
         st.session_state['page'] = 'Book Keeping'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Book Keeping')
         st.rerun()
-
     if st.button("Pending Orders"):
         st.session_state['page'] = 'Pending Orders'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Pending Orders')
         st.rerun()
-
     if st.button("Record Checking"):
         st.session_state['page'] = 'Record Checking'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Record Checking')
         st.rerun()
-
     if st.button("Quick Responses"):
         st.session_state['page'] = 'Quick Responses'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Quick Responses')
         st.rerun()
-
     if st.button("Stock Taking"):
         st.session_state['page'] = 'Stock Taking'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Stock Taking')
         st.rerun()
 
+# === PENDING ORDERS PAGE ===
 @st.cache_data(show_spinner=False)
 def get_pending_df(_refresh_trigger):
     sheet = load_gspread()
@@ -315,11 +327,14 @@ def pending_orders_page():
         st.title("Pending Orders")
     with col2:
         st.button("Home", key="home_button_pending", on_click=go_home)
+   
     if 'refresh_trigger' not in st.session_state:
         st.session_state['refresh_trigger'] = time.time()
+   
     if st.button("Refresh", key="refresh_button_pending"):
-        get_pending_df.clear()
+        get_pending_df.clear() # Clear cache to force fresh data
         st.session_state['refresh_trigger'] = time.time()
+   
     pending_df = get_pending_df(st.session_state['refresh_trigger'])
     st.markdown("""
     <style>
@@ -336,9 +351,10 @@ def pending_orders_page():
     });
     </script>
     """, unsafe_allow_html=True)
+    # Debugging output to verify data
     if not pending_df.empty:
         st.write(f"Found {len(pending_df)} pending orders:")
-        st.dataframe(pending_df, use_container_width=True)
+        st.dataframe(pending_df, use_container_width=True) # Display raw data for debugging
         for index, row in pending_df.iterrows():
             if st.button(f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})", key=f"order_{row['Order']}"):
                 st.session_state['selected_order'] = row['Order']
@@ -348,24 +364,20 @@ def pending_orders_page():
                 st.rerun()
     else:
         st.warning("No pending orders found. Check if 'Status' column in Google Sheet has 'Pending' entries.")
+    # Handle navigation
     if st.session_state.get('page') != 'Pending Orders':
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state(st.session_state['page'])
         st.rerun()
 
-def go_pending():
-    st.session_state['page'] = 'Pending Orders'
-    st.session_state['refresh_trigger'] = time.time()
-    reset_page_state('Pending Orders')
-    st.rerun()
-
+# === ORDER DETAILS PAGE ===
 def order_details_page():
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("Order Details")
     with col2:
         st.button("Home", key="home_button_details", on_click=go_home)
-    st.button("Return", key="return_button", on_click=go_pending)
+    st.button("Return", key="return_button", on_click=lambda: st.session_state.update({'page': 'Pending Orders', 'refresh_trigger': time.time()}))
     st.markdown("""
     <style>
     .stTextInput, .stTextArea { width: 100% !important; }
@@ -390,6 +402,7 @@ def order_details_page():
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
     order_row = df[df['Order'] == st.session_state['selected_order']].iloc[0]
+    # Display order details with improved formatting
     st.markdown('<div class="item-container"><p class="item-label">Order Number:</p>', unsafe_allow_html=True)
     st.text_area("", value=str(order_row['Order']) if not pd.isna(order_row['Order']) else "", height=50, disabled=True, key=f"order_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
@@ -405,8 +418,9 @@ def order_details_page():
     st.markdown('<div class="item-container"><p class="item-label">Address:</p>', unsafe_allow_html=True)
     st.text_area("", value=str(order_row['Address']) if not pd.isna(order_row['Address']) else "", height=100, disabled=True, key=f"address_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
+    # SF Delivery Number input
     st.markdown('<div class="item-container"><p class="item-label">Enter SF Delivery Number:</p>', unsafe_allow_html=True)
-    sf_input = st.text_input("", key="sf_input", value=st.session_state.get('sf_input', ""))
+    st.text_input("", key="sf_input", value=st.session_state.get('sf_input', ""))
     st.markdown('</div>', unsafe_allow_html=True)
     if 'show_submit' not in st.session_state:
         st.session_state['show_submit'] = True
@@ -421,13 +435,14 @@ def order_details_page():
                 st.error("Failed to update SF Delivery Number.")
         else:
             st.error("Please enter a delivery number.")
+    # Success banner and message
     if 'success' in st.session_state:
-        st.success("SF Delivery Number updated successfully!", icon="Checkmark")
+        st.success("SF Delivery Number updated successfully!", icon="✅")
         if 'message_lang' not in st.session_state:
-            st.session_state['message_lang'] = 'en'
+            st.session_state['message_lang'] = 'en' # Default to English
         st.markdown('<div class="item-container"><p class="item-label">Delivery Message:</p>', unsafe_allow_html=True)
         if st.session_state['message_lang'] == 'zh':
-            message = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持"
+            message = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持🫡"
             st.text_area("", value=message, height=100, disabled=True, key="message_chinese")
         else:
             message = f"SF Delivery Number: {st.session_state['sf_delivery']}\nHello shoes are sent. Please leave a 5 star review when receiving the product. Have a nice day."
@@ -444,93 +459,64 @@ def order_details_page():
         st.markdown('</div>', unsafe_allow_html=True)
         if st.button("Finish"):
             if update_order_status(st.session_state['selected_order'], "Delivered"):
-                del st.session_state['success']
+                st.session_state['success'] = False
                 st.session_state['page'] = 'Pending Orders'
                 st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
                 reset_page_state('Pending Orders')
                 st.rerun()
             else:
                 st.error("Failed to update order status.")
+    # Handle navigation
     if st.session_state.get('page') != 'Order Details':
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state(st.session_state['page'])
         st.rerun()
 
-def stock_taking_page():
+# === RECORD CHECKING PAGE ===
+def record_checking_page():
     col1, col2 = st.columns([8, 1])
     with col1:
-        st.title("Stock Taking")
+        st.title("Transaction Record")
     with col2:
-        st.button("Home", key="home_stock", on_click=go_home)
-
+        st.button("Home", key="home_button_record", on_click=go_home)
     st.markdown("""
     <style>
-    .stTextArea textarea { font-family: monospace; }
+    .stTextInput, .stTextArea { width: 100% !important; }
+    .stDataFrame { width: 100%; overflow-x: auto; }
+    .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
+    .stTextArea textarea { user-select: all; }
     </style>
+    <script>
+    document.querySelectorAll('textarea').forEach(textarea => {
+        textarea.addEventListener('dblclick', function() {
+            this.select();
+        });
+    });
+    </script>
     """, unsafe_allow_html=True)
+    st.header("Record Checking")
+    query = st.text_input("Enter search terms (e.g., date, shoe model, name)", value=st.session_state.get('search_query', ""))
+    if st.button("Search"):
+        if query:
+            st.session_state['search_query'] = query
+            results = search_sheet(query)
+            if not results.empty:
+                st.dataframe(results, use_container_width=True)
+            else:
+                st.warning("No matches found.")
+        else:
+            st.error("Enter search terms.")
+    # Handle navigation
+    if st.session_state.get('page') != 'Record Checking':
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state(st.session_state['page'])
+        st.rerun()
 
-    input_text = st.text_area(
-        "Enter stock items (one per line: Shoe Name → Cost)", 
-        height=200,
-        key="stock_input"
-    )
-
-    if st.button("Add to Sheet", key="add_stock_btn"):
-        lines = [line.strip() for line in input_text.splitlines() if line.strip()]
-        
-        if not lines:
-            st.error("Enter at least one shoe and cost.")
-            return
-
-        if len(lines) % 2 != 0:
-            st.error(f"Invalid input: {len(lines)} lines. Must be even (Shoe + Cost per pair).")
-            return
-
-        sheet = load_gspread()
-        success_count = 0
-        errors = []
-
-        with st.spinner(f"Adding {len(lines)//2} items to sheet..."):
-            for i in range(0, len(lines), 2):
-                shoe_name = lines[i]
-                try:
-                    cost = float(lines[i+1])
-                except ValueError:
-                    errors.append(f"{shoe_name}: Cost '{lines[i+1]}' is not a number")
-                    continue
-
-                try:
-                    date = datetime.now().strftime("%d/%m/%Y")
-                    sheet.append_row([
-                        "",           # Order
-                        date,         # Date
-                        "",           # Carousell ID
-                        shoe_name,    # Item
-                        "",           # Color
-                        "",           # Size
-                        "Stock",      # Status
-                        "",           # Phone
-                        "",           # Address
-                        cost          # SF Delivery Number → used as Cost
-                    ])
-                    success_count += 1
-                except Exception as e:
-                    errors.append(f"{shoe_name}: {str(e)}")
-
-        if success_count > 0:
-            st.success(f"Added {success_count} item(s) to sheet!")
-        
-        if errors:
-            st.error(f"{len(errors)} error(s):")
-            for err in errors:
-                st.code(err)
-
-# === Main Router ===
+# === MAIN APP ===
 query_params = st.query_params.to_dict()
 if 'logged_in' in query_params and query_params['logged_in'] == 'true' and 'page' in query_params and st.session_state.get('logged_in'):
     st.session_state['page'] = query_params['page']
     st.session_state['last_activity'] = time.time()
-
 if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
     login_page()
 else:
@@ -548,99 +534,16 @@ else:
     if 'page' not in st.session_state:
         st.session_state['page'] = 'Home'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-
     if st.session_state['page'] == 'Home':
         home_page()
     elif st.session_state['page'] == 'Book Keeping':
-        col1, col2 = st.columns([8, 1])
-        with col1:
-            st.title("Transaction Record")
-        with col2:
-            st.button("Home", key="home_button", on_click=go_home)
-        st.markdown("""
-        <style>
-        .stTextInput, .stTextArea { width: 100% !important; }
-        .stDataFrame { width: 100%; overflow-x: auto; }
-        .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
-        .stTextArea textarea { user-select: all; }
-        </style>
-        <script>
-        document.querySelectorAll('textarea').forEach(textarea => {
-            textarea.addEventListener('dblclick', function() {
-                this.select();
-            });
-        });
-        </script>
-        """, unsafe_allow_html=True)
-        st.markdown('<h3 style="font-size: 1.4em;">Paste transaction here.</h3>', unsafe_allow_html=True)
-        template_text = st.text_area("", value=st.session_state.get('input_text', ""), height=200, key="template_text")
-        if 'show_button' not in st.session_state:
-            st.session_state['show_button'] = True
-        if st.session_state['show_button'] and st.button("Process and Add"):
-            if template_text:
-                order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number = extract_data(template_text)
-                if all([item, color, size, phone, address]):
-                    result = add_to_sheet(order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number)
-                    if result is True:
-                        st.session_state['success'] = True
-                        st.session_state['show_button'] = False
-                        st.session_state['input_text'] = ""
-                        st.rerun()
-                    else:
-                        st.session_state['error'] = result
-                        st.rerun()
-                else:
-                    st.error("Couldn't extract all required data. Check template.")
-            else:
-                st.error("Enter template text.")
-        if 'success' in st.session_state:
-            st.success("Entry added successfully!", icon="Checkmark")
-            st.button("Add Another Entry", on_click=clear_template_input)
-        elif 'error' in st.session_state:
-            st.error(f"Failed to add entry: {st.session_state['error']}")
-            if st.button("Home"):
-                go_home()
+        book_keeping_page()
     elif st.session_state['page'] == 'Pending Orders':
         pending_orders_page()
     elif st.session_state['page'] == 'Order Details':
         order_details_page()
     elif st.session_state['page'] == 'Record Checking':
-        col1, col2 = st.columns([8, 1])
-        with col1:
-            st.title("Transaction Record")
-        with col2:
-            st.button("Home", key="home_button_record", on_click=go_home)
-        st.markdown("""
-        <style>
-        .stTextInput, .stTextArea { width: 100% !important; }
-        .stDataFrame { width: 100%; overflow-x: auto; }
-        .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
-        .stTextArea textarea { user-select: all; }
-        </style>
-        <script>
-        document.querySelectorAll('textarea').forEach(textarea => {
-            textarea.addEventListener('dblclick', function() {
-                this.select();
-            });
-        });
-        </script>
-        """, unsafe_allow_html=True)
-        st.header("Record Checking")
-        query = st.text_input("Enter search terms (e.g., date, shoe model, name)", value=st.session_state.get('search_query', ""))
-        if st.button("Search"):
-            if query:
-                st.session_state['search_query'] = query
-                results = search_sheet(query)
-                if not results.empty:
-                    st.dataframe(results, use_container_width=True)
-                else:
-                    st.warning("No matches found.")
-            else:
-                st.error("Enter search terms.")
-        if st.session_state.get('page') != 'Record Checking':
-            st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-            reset_page_state(st.session_state['page'])
-            st.rerun()
+        record_checking_page()
     elif st.session_state['page'] == 'Quick Responses':
         quick_responses_page()
     elif st.session_state['page'] == 'Stock Taking':
