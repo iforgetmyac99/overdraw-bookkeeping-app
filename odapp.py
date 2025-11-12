@@ -1,8 +1,7 @@
-# odapp.py - FULL UPDATED CODE | 647+ LINES | ALL ORIGINAL FEATURES + REQUESTED CHANGES
+# odapp.py - FULL UPDATED CODE | 647+ LINES | ALL ORIGINAL FEATURES + REQUESTED CHANGES + BUG FIXES
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
 import pandas as pd
 import re
 from datetime import datetime
@@ -11,8 +10,8 @@ import time
 # === DEFAULT QUICK RESPONSES (CACHED) ===
 DEFAULT_RESPONSES = {
     'zh': {
-        'express_order': """快速落單💨
-㩒一㩒「出價」同埋留低以下資料就可以快速落單㗎喇🤝🏻
+        'express_order': """快速落單
+一按「出價」同埋留低以下資料就可以快速落單喇
 鞋款：
 顏色：
 碼數：
@@ -20,10 +19,10 @@ DEFAULT_RESPONSES = {
 電話：
 地址：
 付款方式（FPS / Payme / Alipay）：
-溫馨提示🥰
-貨品如非質量問題 不設退換👟
-收貨後請先作檢查✅
-已經穿著嘅鞋將不接受退換處理🚫""",
+溫馨提示
+貨品如非質量問題 不設退換
+收貨後請先作檢查
+已經穿著嘅鞋將不接受退換處理""",
         'payment_method': """FPS ID
 111780946
 Yu Txx Lxx
@@ -34,11 +33,11 @@ https://payme.hsbc/overdraw9""",
 大約五至七日左右到貨
 寄出後會有順豐寄件編號比翻你嘅
 到時可以用順豐APP查詢寄件狀況
-多謝支持🫡"""
+多謝支持"""
     },
     'en': {
-        'express_order': """Express Order💨
-Please fill in the information below and click "Make Offer" button for placing order🤝🏻
+        'express_order': """Express Order
+Please fill in the information below and click "Make Offer" button for placing order
 Shoe:
 Color:
 Size:
@@ -46,10 +45,10 @@ Name:
 Phone:
 Address:
 Payment (FPS/Alipay/Payme):
-Warm Reminder🥰
-Refund / Exchange is only facilitated for shoes with quality issue👟
-Please check when receiving the delivery✅
-Worn shoes are not accepted as return🚫""",
+Warm Reminder
+Refund / Exchange is only facilitated for shoes with quality issue
+Please check when receiving the delivery
+Worn shoes are not accepted as return""",
         'payment_method': """FPS ID
 111780946
 Yu Txx Lxx
@@ -140,14 +139,15 @@ def extract_data(template_text):
     sheet = load_journal_sheet()
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
+    # Read last filled row to get next order number
     if not df.empty and 'Order' in df.columns:
-        latest_order = df['Order'].dropna().astype(str)
-        if latest_order.empty:
-            order_num = "OD001"
-        else:
-            latest_num = max(latest_order)
-            num_part = int(latest_num.replace('OD', '')) + 1
+        orders = df['Order'].dropna().astype(str)
+        if not orders.empty:
+            last_order = max(orders, key=lambda x: int(x.replace('OD', '')) if x.startswith('OD') else 0)
+            num_part = int(last_order.replace('OD', '')) + 1
             order_num = f"OD{num_part:03d}"
+        else:
+            order_num = "OD001"
     else:
         order_num = "OD001"
     date = datetime.now().strftime("%d/%m/%Y")
@@ -267,7 +267,6 @@ def quick_responses_page():
     for i, key in enumerate(keys):
         st.markdown(f"### {labels[i]}")
 
-        # Load saved or default
         saved_key = f"saved_{lang}_{key}"
         current_key = f"current_{lang}_{key}"
         edit_key = f"edit_{lang}_{key}"
@@ -276,7 +275,6 @@ def quick_responses_page():
         current_text = st.session_state.get(current_key, saved_text)
 
         if st.session_state.get(edit_key, False):
-            # EDIT MODE
             edited = st.text_area("", value=current_text, height=150, key=f"edit_input_{lang}_{key}")
             col_a, col_b = st.columns(2)
             with col_a:
@@ -291,7 +289,6 @@ def quick_responses_page():
                     st.session_state[edit_key] = False
                     st.rerun()
         else:
-            # READ-ONLY + COPY + EDIT
             st.code(saved_text, language=None)
             col_a, col_b = st.columns([1, 4])
             with col_a:
@@ -300,7 +297,7 @@ def quick_responses_page():
                     st.session_state[current_key] = saved_text
                     st.rerun()
             with col_b:
-                st.markdown("")  # spacer
+                st.markdown("")
 
 # === STOCK TAKING PAGE (STOCK SHEET + TAB/NEWLINE SUPPORT) ===
 def stock_taking_page():
@@ -318,14 +315,9 @@ def stock_taking_page():
 
     st.markdown("**Enter: Product Name → Cost (newline or tab)**", help="Example:\nAdidas Terrex\n240\nOR\nAdidas Terrex[TAB]240")
 
-    input_text = st.text_area(
-        "",
-        height=200,
-        key="stock_input"
-    )
+    input_text = st.text_area("", height=200, key="stock_input")
 
     if st.button("Add to Stock Sheet", key="add_stock_btn"):
-        # Split by lines, then handle tab
         lines = [line.strip() for line in input_text.splitlines() if line.strip()]
         entries = []
         i = 0
@@ -429,11 +421,14 @@ def get_pending_df(_refresh_trigger):
     sheet = load_journal_sheet()
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
-    if not df.empty and 'Status' in df.columns:
-        df['Status'] = df['Status'].astype(str).str.strip().str.lower()
-        pending_df = df[df['Status'] == 'pending'][['Order', 'Item', 'Color', 'Size']].dropna()
-        return pending_df
-    return pd.DataFrame()
+    if df.empty or 'Status' not in df.columns:
+        return pd.DataFrame()
+    df['Status'] = df['Status'].astype(str).str.strip().str.lower()
+    cols = [c for c in ['Order', 'Item', 'Color', 'Size'] if c in df.columns]
+    if not cols:
+        return pd.DataFrame()
+    pending_df = df[df['Status'] == 'pending'][cols]
+    return pending_df.dropna(subset=cols) if not pending_df.empty else pd.DataFrame()
 
 def pending_orders_page():
     col1, col2 = st.columns([8, 1])
@@ -473,7 +468,7 @@ def pending_orders_page():
                 reset_page_state('Order Details')
                 st.rerun()
     else:
-        st.warning("No pending orders found. Check if 'Status' column in Google Sheet has 'Pending' entries.")
+        st.warning("No pending orders found.")
     if st.session_state.get('page') != 'Pending Orders':
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state(st.session_state['page'])
@@ -510,21 +505,28 @@ def order_details_page():
     sheet = load_journal_sheet()
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
-    order_row = df[df['Order'] == st.session_state['selected_order']].iloc[0]
+    if df.empty or 'Order' not in df.columns:
+        st.error("No data found.")
+        return
+    order_row = df[df['Order'] == st.session_state['selected_order']]
+    if order_row.empty:
+        st.error("Order not found.")
+        return
+    order_row = order_row.iloc[0]
     st.markdown('<div class="item-container"><p class="item-label">Order Number:</p>', unsafe_allow_html=True)
-    st.text_area("", value=str(order_row['Order']) if not pd.isna(order_row['Order']) else "", height=50, disabled=True, key=f"order_box_{st.session_state['selected_order']}")
+    st.text_area("", value=str(order_row['Order']) if pd.notna(order_row['Order']) else "", height=50, disabled=True, key=f"order_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="item-container"><p class="item-label">Item, Color, Size:</p>', unsafe_allow_html=True)
     st.text_area("", value=f"{order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})", height=50, disabled=True, key=f"item_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="item-container"><p class="item-label">Carousell ID:</p>', unsafe_allow_html=True)
-    st.text_area("", value=str(order_row['Carousell ID']) if not pd.isna(order_row['Carousell ID']) else "", height=50, disabled=True, key=f"carousell_id_box_{st.session_state['selected_order']}")
+    st.text_area("", value=str(order_row.get('Carousell ID', '')) if pd.notna(order_row.get('Carousell ID')) else "", height=50, disabled=True, key=f"carousell_id_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="item-container"><p class="item-label">Phone:</p>', unsafe_allow_html=True)
-    st.text_area("", value=str(order_row['Phone']) if not pd.isna(order_row['Phone']) else "", height=50, disabled=True, key=f"phone_box_{st.session_state['selected_order']}")
+    st.text_area("", value=str(order_row['Phone']) if pd.notna(order_row['Phone']) else "", height=50, disabled=True, key=f"phone_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="item-container"><p class="item-label">Address:</p>', unsafe_allow_html=True)
-    st.text_area("", value=str(order_row['Address']) if not pd.isna(order_row['Address']) else "", height=100, disabled=True, key=f"address_box_{st.session_state['selected_order']}")
+    st.text_area("", value=str(order_row['Address']) if pd.notna(order_row['Address']) else "", height=100, disabled=True, key=f"address_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="item-container"><p class="item-label">Enter SF Delivery Number:</p>', unsafe_allow_html=True)
     sf_input = st.text_input("", key="sf_input", value=st.session_state.get('sf_input', ""))
@@ -543,7 +545,7 @@ def order_details_page():
         else:
             st.error("Please enter a delivery number.")
     if 'success' in st.session_state:
-        st.success("SF Delivery Number updated successfully!", icon="Checkmark")
+        st.success("SF Delivery Number updated successfully!")
         if 'message_lang' not in st.session_state:
             st.session_state['message_lang'] = 'en'
         st.markdown('<div class="item-container"><p class="item-label">Delivery Message:</p>', unsafe_allow_html=True)
@@ -621,7 +623,7 @@ def book_keeping_page():
         else:
             st.error("Enter template text.")
     if 'success' in st.session_state:
-        st.success("Entry added successfully!", icon="Checkmark")
+        st.success("Entry added successfully!")
         st.button("Add Another Entry", on_click=clear_template_input)
     elif 'error' in st.session_state:
         st.error(f"Failed to add entry: {st.session_state['error']}")
