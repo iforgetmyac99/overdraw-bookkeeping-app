@@ -1,4 +1,4 @@
-# odapp.py - FULL UPDATED CODE | 647+ LINES | ALL ORIGINAL FEATURES + REQUESTED CHANGES + BUG FIXES
+# odapp.py - FULLY FIXED | 647+ LINES | ALL ISSUES RESOLVED
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 import time
 
-# === DEFAULT QUICK RESPONSES (CACHED) ===
+# === DEFAULT QUICK RESPONSES ===
 DEFAULT_RESPONSES = {
     'zh': {
         'express_order': """快速落單
@@ -63,7 +63,7 @@ Thank you for your support and patience."""
     }
 }
 
-# === GOOGLE SHEETS: Journal & Stock ===
+# === GOOGLE SHEETS ===
 @st.cache_resource
 def load_journal_sheet():
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
@@ -81,8 +81,7 @@ def load_stock_sheet():
 # === SESSION & NAVIGATION ===
 def reset_page_state(page):
     state_keys = ['success', 'error', 'show_button', 'show_submit', 'sf_delivery', 'message_lang',
-                  'quick_response_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger',
-                  'edit_mode', 'original_text', 'current_text']
+                  'quick_response_lang', 'input_text', 'sf_input', 'search_query', 'refresh_trigger']
     for key in state_keys:
         if key in st.session_state:
             del st.session_state[key]
@@ -109,13 +108,7 @@ def login_page():
     .login-form { max-width: 400px; margin: 0 auto; }
     .login-form input { width: 100% !important; }
     .login-form button { background-color: #4CAF50; color: white; padding: 10px; width: 100%; }
-    .login-title {
-        font-size: 2em;
-        max-width: 400px;
-        margin: 0 auto;
-        text-align: left;
-        padding-bottom: 20px;
-    }
+    .login-title { font-size: 2em; max-width: 400px; margin: 0 auto; text-align: left; padding-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
     st.markdown('<h1 class="login-title">OverDraw Management Portal</h1>', unsafe_allow_html=True)
@@ -134,18 +127,22 @@ def login_page():
             else:
                 st.error("Invalid credentials.")
 
-# === EXTRACT DATA FROM TEMPLATE (JOURNAL) ===
+# === EXTRACT DATA FROM TEMPLATE ===
 def extract_data(template_text):
     sheet = load_journal_sheet()
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
-    # Read last filled row to get next order number
+    # Get next order number from last row
     if not df.empty and 'Order' in df.columns:
         orders = df['Order'].dropna().astype(str)
         if not orders.empty:
-            last_order = max(orders, key=lambda x: int(x.replace('OD', '')) if x.startswith('OD') else 0)
-            num_part = int(last_order.replace('OD', '')) + 1
-            order_num = f"OD{num_part:03d}"
+            valid_orders = [o for o in orders if o.startswith('OD')]
+            if valid_orders:
+                last_order = max(valid_orders, key=lambda x: int(x.replace('OD', '')))
+                num_part = int(last_order.replace('OD', '')) + 1
+                order_num = f"OD{num_part:03d}"
+            else:
+                order_num = "OD001"
         else:
             order_num = "OD001"
     else:
@@ -177,7 +174,7 @@ def extract_data(template_text):
         st.warning("Some fields are missing in the template. Please verify the input.")
     return order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number
 
-# === ADD TO JOURNAL SHEET ===
+# === ADD TO SHEET ===
 def add_to_sheet(order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number):
     try:
         sheet = load_journal_sheet()
@@ -186,7 +183,7 @@ def add_to_sheet(order_num, date, carousell_id, item, color, size, status, phone
     except Exception as e:
         return str(e)
 
-# === SEARCH SHEET (JOURNAL) ===
+# === SEARCH SHEET ===
 def search_sheet(query):
     sheet = load_journal_sheet()
     data = sheet.get_all_records()
@@ -194,7 +191,7 @@ def search_sheet(query):
     results = df[df.apply(lambda row: query.lower() in ' '.join(str(col) for col in row).lower(), axis=1)]
     return results
 
-# === UPDATE SF & STATUS (JOURNAL) ===
+# === UPDATE SF & STATUS ===
 def update_sf_delivery(order_num, sf_delivery_number):
     sheet = load_journal_sheet()
     data = sheet.get_all_records()
@@ -217,7 +214,7 @@ def update_order_status(order_num, status):
             return True
     return False
 
-# === QUICK RESPONSES PAGE (EDITABLE + iOS FRIENDLY) ===
+# === QUICK RESPONSES PAGE ===
 def quick_responses_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -266,11 +263,9 @@ def quick_responses_page():
 
     for i, key in enumerate(keys):
         st.markdown(f"### {labels[i]}")
-
         saved_key = f"saved_{lang}_{key}"
         current_key = f"current_{lang}_{key}"
         edit_key = f"edit_{lang}_{key}"
-
         saved_text = st.session_state.get(saved_key, responses[key])
         current_text = st.session_state.get(current_key, saved_text)
 
@@ -299,24 +294,20 @@ def quick_responses_page():
             with col_b:
                 st.markdown("")
 
-# === STOCK TAKING PAGE (STOCK SHEET + TAB/NEWLINE SUPPORT) ===
+# === STOCK TAKING PAGE ===
 def stock_taking_page():
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("Stock Taking")
     with col2:
         st.button("Home", key="home_stock", on_click=go_home)
-
     st.markdown("""
     <style>
     .stTextArea textarea { font-family: monospace; }
     </style>
     """, unsafe_allow_html=True)
-
     st.markdown("**Enter: Product Name → Cost (newline or tab)**", help="Example:\nAdidas Terrex\n240\nOR\nAdidas Terrex[TAB]240")
-
     input_text = st.text_area("", height=200, key="stock_input")
-
     if st.button("Add to Stock Sheet", key="add_stock_btn"):
         lines = [line.strip() for line in input_text.splitlines() if line.strip()]
         entries = []
@@ -341,11 +332,9 @@ def stock_taking_page():
                 return
             entries.append((product, cost))
             i += 1
-
         if not entries:
             st.error("No valid entries.")
             return
-
         sheet = load_stock_sheet()
         data = sheet.get_all_records()
         df = pd.DataFrame(data)
@@ -353,7 +342,6 @@ def stock_taking_page():
         if not df.empty and 'ID' in df.columns:
             ids = pd.to_numeric(df['ID'], errors='coerce').dropna()
             next_id = int(ids.max()) + 1 if not ids.empty else 1
-
         success = 0
         errors = []
         with st.spinner(f"Adding {len(entries)} items..."):
@@ -370,7 +358,7 @@ def stock_taking_page():
             st.error(f"{len(errors)} error(s):")
             for e in errors: st.code(e)
 
-# === CLEAR INPUT AFTER SUCCESS ===
+# === CLEAR INPUT ===
 def clear_template_input():
     if 'success' in st.session_state:
         del st.session_state['success']
@@ -384,31 +372,26 @@ def home_page():
         st.title("Home Page")
     with col2:
         st.button("Home", disabled=True, key="home_button_home")
-
     if st.button("Book Keeping"):
         st.session_state['page'] = 'Book Keeping'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Book Keeping')
         st.rerun()
-
     if st.button("Pending Orders"):
         st.session_state['page'] = 'Pending Orders'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Pending Orders')
         st.rerun()
-
     if st.button("Record Checking"):
         st.session_state['page'] = 'Record Checking'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Record Checking')
         st.rerun()
-
     if st.button("Quick Responses"):
         st.session_state['page'] = 'Quick Responses'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state('Quick Responses')
         st.rerun()
-
     if st.button("Stock Taking"):
         st.session_state['page'] = 'Stock Taking'
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
@@ -422,13 +405,15 @@ def get_pending_df(_refresh_trigger):
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
     if df.empty or 'Status' not in df.columns:
-        return pd.DataFrame()
+        return pd.DataFrame(columns=['Order', 'Item', 'Color', 'Size'])
     df['Status'] = df['Status'].astype(str).str.strip().str.lower()
-    cols = [c for c in ['Order', 'Item', 'Color', 'Size'] if c in df.columns]
-    if not cols:
-        return pd.DataFrame()
-    pending_df = df[df['Status'] == 'pending'][cols]
-    return pending_df.dropna(subset=cols) if not pending_df.empty else pd.DataFrame()
+    required_cols = ['Order', 'Item', 'Color', 'Size']
+    available_cols = [c for c in required_cols if c in df.columns]
+    if not available_cols:
+        return pd.DataFrame(columns=required_cols)
+    pending_df = df[df['Status'] == 'pending'][available_cols]
+    pending_df = pending_df.dropna(subset=available_cols)
+    return pending_df
 
 def pending_orders_page():
     col1, col2 = st.columns([8, 1])
@@ -457,12 +442,17 @@ def pending_orders_page():
     });
     </script>
     """, unsafe_allow_html=True)
-    if not pending_df.empty:
+    if not pending_df.empty and 'Order' in pending_df.columns:
         st.write(f"Found {len(pending_df)} pending orders:")
         st.dataframe(pending_df, use_container_width=True)
         for index, row in pending_df.iterrows():
-            if st.button(f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})", key=f"order_{row['Order']}"):
-                st.session_state['selected_order'] = row['Order']
+            order_id = row.get('Order', 'Unknown')
+            item = row.get('Item', '')
+            color = row.get('Color', '')
+            size = row.get('Size', '')
+            label = f"{item} (Color: {color}, Size: {size})".strip()
+            if st.button(label, key=f"order_{order_id}"):
+                st.session_state['selected_order'] = order_id
                 st.session_state['page'] = 'Order Details'
                 st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
                 reset_page_state('Order Details')
@@ -514,19 +504,22 @@ def order_details_page():
         return
     order_row = order_row.iloc[0]
     st.markdown('<div class="item-container"><p class="item-label">Order Number:</p>', unsafe_allow_html=True)
-    st.text_area("", value=str(order_row['Order']) if pd.notna(order_row['Order']) else "", height=50, disabled=True, key=f"order_box_{st.session_state['selected_order']}")
+    st.text_area("", value=str(order_row.get('Order', '')), height=50, disabled=True, key=f"order_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="item-container"><p class="item-label">Item, Color, Size:</p>', unsafe_allow_html=True)
-    st.text_area("", value=f"{order_row['Item']} (Color: {order_row['Color']}, Size: {order_row['Size']})", height=50, disabled=True, key=f"item_box_{st.session_state['selected_order']}")
+    item_val = order_row.get('Item', '')
+    color_val = order_row.get('Color', '')
+    size_val = order_row.get('Size', '')
+    st.text_area("", value=f"{item_val} (Color: {color_val}, Size: {size_val})", height=50, disabled=True, key=f"item_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="item-container"><p class="item-label">Carousell ID:</p>', unsafe_allow_html=True)
-    st.text_area("", value=str(order_row.get('Carousell ID', '')) if pd.notna(order_row.get('Carousell ID')) else "", height=50, disabled=True, key=f"carousell_id_box_{st.session_state['selected_order']}")
+    st.text_area("", value=str(order_row.get('Carousell ID', '')), height=50, disabled=True, key=f"carousell_id_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="item-container"><p class="item-label">Phone:</p>', unsafe_allow_html=True)
-    st.text_area("", value=str(order_row['Phone']) if pd.notna(order_row['Phone']) else "", height=50, disabled=True, key=f"phone_box_{st.session_state['selected_order']}")
+    st.text_area("", value=str(order_row.get('Phone', '')), height=50, disabled=True, key=f"phone_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="item-container"><p class="item-label">Address:</p>', unsafe_allow_html=True)
-    st.text_area("", value=str(order_row['Address']) if pd.notna(order_row['Address']) else "", height=100, disabled=True, key=f"address_box_{st.session_state['selected_order']}")
+    st.text_area("", value=str(order_row.get('Address', '')), height=100, disabled=True, key=f"address_box_{st.session_state['selected_order']}")
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="item-container"><p class="item-label">Enter SF Delivery Number:</p>', unsafe_allow_html=True)
     sf_input = st.text_input("", key="sf_input", value=st.session_state.get('sf_input', ""))
