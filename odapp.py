@@ -11,7 +11,9 @@ import time
 DEFAULT_RESPONSES = {
     'zh': {
         'express_order': """快速落單
+        
 一按「出價」同埋留低以下資料就可以快速落單喇
+
 鞋款：
 顏色：
 碼數：
@@ -19,13 +21,15 @@ DEFAULT_RESPONSES = {
 電話：
 地址：
 付款方式（FPS / Payme / Alipay）：
-溫馨提示
+
+溫馨提示:
 貨品如非質量問題 不設退換
 收貨後請先作檢查
 已經穿著嘅鞋將不接受退換處理""",
         'payment_method': """FPS ID
 111780946
 Yu Txx Lxx
+
 Payme
 Tap to PayMe!
 https://payme.hsbc/overdraw9""",
@@ -36,7 +40,9 @@ https://payme.hsbc/overdraw9""",
 多謝支持""",
         'more_products': """更多款式請入profile挑選或DM查詢
 付款後七至十日到貨
-貨品會經由順豐寄到客人指定地址"""
+貨品會經由順豐寄到客人指定地址
+Visit profile / DM for more products
+Delivery will be sent in around 7 days through SF (Shipping included)"""
     },
     'en': {
         'express_order': """Express Order
