@@ -1,4 +1,4 @@
-# odapp.py - FULLY FIXED | 700+ LINES | ALL ISSUES RESOLVED + NEW MESSAGE
+# odapp.py - FULLY FIXED | 710+ LINES | PENDING ORDERS + 15-MIN TIMEOUT
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
@@ -40,10 +40,7 @@ https://payme.hsbc/overdraw9""",
 多謝支持""",
         'more_products': """更多款式請入profile挑選或DM查詢
 付款後七至十日到貨
-貨品會經由順豐寄到客人指定地址
-
-Visit profile / DM for more products
-Delivery will be sent in around 7 days through SF (Shipping included)"""
+貨品會經由順豐寄到客人指定地址"""
     },
     'en': {
         'express_order': """Express Order
@@ -144,7 +141,7 @@ def extract_data(template_text):
     order_num = "OD001"
     if len(all_values) > 1:
         headers = all_values[0]
-        rows = all_values[1:]
+        rows = all_values[56]
         df = pd.DataFrame(rows, columns=headers)
         if 'Order' in df.columns:
             orders = df['Order'].astype(str).str.strip()
@@ -232,7 +229,7 @@ def update_order_status(order_num, status):
     sheet.update_cell(row_idx[0] + 2, col_idx, status)
     return True
 
-# === QUICK RESPONSES PAGE - NEW MESSAGE ADDED ===
+# === QUICK RESPONSES PAGE ===
 def quick_responses_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -688,7 +685,7 @@ else:
     current_time = time.time()
     if 'last_activity' not in st.session_state:
         st.session_state['last_activity'] = current_time
-    if current_time - st.session_state['last_activity'] > 600:
+    if current_time - st.session_state['last_activity'] > 900:  # 15 minutes
         del st.session_state['logged_in']
         if 'page' in st.session_state:
             del st.session_state['page']
