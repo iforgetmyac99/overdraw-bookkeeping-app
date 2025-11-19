@@ -615,7 +615,14 @@ def book_keeping_page():
     </script>
     """, unsafe_allow_html=True)
     st.markdown('<h3 style="font-size: 1.4em;">Paste transaction here.</h3>', unsafe_allow_html=True)
-    template_text = st.text_area("", value=st.session_state.get('input_text', ""), height=200, key="template_text")
+    template_text = st.text_area(
+        "Paste customer message here",
+        value=st.session_state.get('input_text', ""),
+        height=200,
+        key="template_text",
+        label_visibility="collapsed"
+    )
+    
     if 'show_button' not in st.session_state:
         st.session_state['show_button'] = True
     if st.session_state['show_button'] and st.button("Process and Add"):
