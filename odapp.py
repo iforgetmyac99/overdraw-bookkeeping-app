@@ -135,41 +135,45 @@ def login_page():
                 st.error("Invalid credentials.")
 
 # === EXTRACT DATA FROM TEMPLATE - FIXED ORDER NUMBER ===
+# === EXTRACT DATA FROM TEMPLATE - FULLY FIXED ===
 def extract_data(template_text):
     sheet = load_journal_sheet()
     all_values = sheet.get_all_values()
+    
+    # --- Generate next Order number ---
     order_num = "OD001"
     if len(all_values) > 1:
-        headers = all_values[0]
-        rows = all_values[56]
-        df = pd.DataFrame(rows, columns=headers)
+        df = pd.DataFrame(all_values[1:], columns=all_values[0])  # proper DataFrame
         if 'Order' in df.columns:
             orders = df['Order'].astype(str).str.strip()
-            od_orders = orders[orders.str.startswith('OD') & orders.str.len() == 5]
+            od_orders = orders[orders.str.startswith('OD') & (orders.str.len() == 5)]
             if not od_orders.empty:
                 max_num = max(od_orders, key=lambda x: int(x[2:]))
                 next_num = int(max_num[2:]) + 1
                 order_num = f"OD{next_num:03d}"
+
     date = datetime.now().strftime("%d/%m/%Y")
-    item = color = size = name = phone = address = ""
     status = "Pending"
     sf_delivery_number = ""
 
-    # English
-    item_en = re.search(r'Shoe:\s*([^\n]+)', template_text)
-    color_en = re.search(r'Color:\s*([^\n]+)', template_text)
-    size_en = re.search(r'Size:\s*(\d+)', template_text)
-    name_en = re.search(r'Name:\s*([^\n]+)', template_text)
+    # Default empty values
+    item = color = size = name = phone = address = carousell_id = ""
+
+    # English pattern
+    item_en = re.search(r'Shoe:\s*([^\n]+)', template_text, re.IGNORECASE)
+    color_en = re.search(r'Color:\s*([^\n]+)', template_text, re.IGNORECASE)
+    size_en = re.search(r'Size:\s*(\d+[.,]?\d*)', template_text)
+    name_en = re.search(r'Name:\s*([^\n]+)', template_text, re.IGNORECASE)
     phone_en = re.search(r'Phone:\s*(\d+)', template_text)
     address_en = re.search(r'Address:\s*(.+)', template_text, re.DOTALL)
 
-    # Chinese
-    item_zh = re.search(r'鞋款：\s*([^\n]+)', template_text)
-    color_zh = re.search(r'顏色：\s*([^\n]+)', template_text)
-    size_zh = re.search(r'碼數：\s*(\d+)', template_text)
-    name_zh = re.search(r'姓名：\s*([^\n]+)', template_text)
-    phone_zh = re.search(r'電話：\s*(\d+)', template_text)
-    address_zh = re.search(r'地址：\s*(.+)', template_text, re.DOTALL)
+    # Chinese pattern
+    item_zh = re.search(r'鞋款[:：]\s*([^\n]+)', template_text)
+    color_zh = re.search(r'顏色[:：]\s*([^\n]+)', template_text)
+    size_zh = re.search(r'碼數[:：]\s*(\d+[.,]?\d*)', template_text)
+    name_zh = re.search(r'姓名[:：]\s*([^\n]+)', template_text)
+    phone_zh = re.search(r'電話[:：]\s*(\d+)', template_text)
+    address_zh = re.search(r'地址[:：]\s*(.+)', template_text, re.DOTALL)
 
     item = (item_en.group(1).strip() if item_en else (item_zh.group(1).strip() if item_zh else ""))
     color = (color_en.group(1).strip() if color_en else (color_zh.group(1).strip() if color_zh else ""))
@@ -177,12 +181,9 @@ def extract_data(template_text):
     name = (name_en.group(1).strip() if name_en else (name_zh.group(1).strip() if name_zh else ""))
     carousell_id = name
     phone = (phone_en.group(1) if phone_en else (phone_zh.group(1) if phone_zh else ""))
-    address = (address_en.group(1).strip() if address_en else (address_zh.group(1).strip() if address_zh else ""))
+    address = (address_en.group(1).strip() if address_en else (address_zh.group(1).strip() if address_zh else "")).strip()
 
-    if not all([item, color, size, name, phone, address]):
-        st.warning("Some fields are missing in the template. Please verify the input.")
     return order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number
-
 # === ADD TO SHEET ===
 def add_to_sheet(order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number):
     try:
