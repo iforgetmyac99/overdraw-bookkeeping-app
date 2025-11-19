@@ -558,22 +558,26 @@ def order_details_page():
     st.markdown('<div class="item-container"><p class="item-label">Enter SF Delivery Number:</p>', unsafe_allow_html=True)
     sf_input = st.text_input("", key="sf_input", value=st.session_state.get('sf_input', ""))
     st.markdown('</div>', unsafe_allow_html=True)
+    # ── Submit SF number → auto mark as Delivered ──
     if st.button("Submit SF Number & Mark as Delivered", type="primary"):
-        if sf_input.strip():
-            if update_sf_delivery(st.session_state['selected_order'], sf_input.strip()):
-                st.success("SF number saved → Status automatically set to **Delivered**")
-                st.session_state['sf_delivery'] = sf_input.strip()
-                
-                # Optional: show message
-                msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
-                st.text_area("Copy this message to customer:", value=msg, height=100)
+        if not sf_input.strip():
+            st.error("Please enter SF number.")
+            st.stop()
 
-                if st.button("← Back to Pending Orders"):
-                    get_pending_df.clear()  # force refresh list
-                    st.session_state['page'] = 'Pending Orders'
-                    st.rerun()
-            else:
-                st.error("Update failed.")
+        success = update_sf_delivery(st.session_state['selected_order'], sf_input.strip())
+        if success:
+            st.success("SF number saved → Status automatically changed to **Delivered**")
+
+            # Show ready-to-copy message
+            msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
+            st.text_area("Copy message to customer:", value=msg, height=100)
+
+            if st.button("Back to Pending Orders"):
+                get_pending_df.clear()          # refresh the list
+                st.session_state.page = "Pending Orders"
+                st.rerun()
+        else:
+            st.error("Failed to update Google Sheet.")
         else:
             st.error("Please enter SF number.")
         else:
