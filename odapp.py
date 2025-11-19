@@ -201,19 +201,39 @@ def search_sheet(query):
     return results
 
 # === UPDATE SF & STATUS ===
+# === UPDATE SF & AUTO-CHANGE STATUS TO DELIVERED ===
 def update_sf_delivery(order_num, sf_delivery_number):
     sheet = load_journal_sheet()
     all_data = sheet.get_all_values()
-    if len(all_data) < 2: return False
+    if len(all_data) < 2:
+        return False
+    
     headers = all_data[0]
     rows = all_data[1:]
     df = pd.DataFrame(rows, columns=headers)
-    if 'Order' not in df.columns: return False
+    
+    if 'Order' not in df.columns:
+        return False
+    
     row_idx = df.index[df['Order'] == order_num].tolist()
-    if not row_idx: return False
-    col_idx = headers.index('SF Delivery Number') + 1
-    sheet.update_cell(row_idx[0] + 2, col_idx, sf_delivery_number)
-    return True
+    if not row_idx:
+        return False
+    
+    row_num = row_idx[0] + 2  # +2 because row 1 = headers, +1 for 0-index
+    
+    try:
+        # Update SF Delivery Number
+        sf_col = headers.index('SF Delivery Number') + 1
+        sheet.update_cell(row_num, sf_col, sf_delivery_number.strip())
+        
+        # Auto-update Status to "Delivered"
+        status_col = headers.index('Status') + 1
+        sheet.update_cell(row_num, status_col, "Delivered")
+        
+        return True
+    except Exception as e:
+        st.error(f"Update failed: {e}")
+        return False
 
 def update_order_status(order_num, status):
     sheet = load_journal_sheet()
@@ -538,19 +558,27 @@ def order_details_page():
     st.markdown('<div class="item-container"><p class="item-label">Enter SF Delivery Number:</p>', unsafe_allow_html=True)
     sf_input = st.text_input("", key="sf_input", value=st.session_state.get('sf_input', ""))
     st.markdown('</div>', unsafe_allow_html=True)
-    if 'show_submit' not in st.session_state:
-        st.session_state['show_submit'] = True
-    if st.session_state['show_submit'] and st.button("Submit"):
-        if sf_input:
-            if update_sf_delivery(st.session_state['selected_order'], sf_input):
-                st.session_state['success'] = True
-                st.session_state['show_submit'] = False
-                st.session_state['sf_delivery'] = sf_input
-                st.rerun()
+    if st.button("Submit SF Number & Mark as Delivered", type="primary"):
+        if sf_input.strip():
+            if update_sf_delivery(st.session_state['selected_order'], sf_input.strip()):
+                st.success("SF number saved → Status automatically set to **Delivered**")
+                st.session_state['sf_delivery'] = sf_input.strip()
+                
+                # Optional: show message
+                msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
+                st.text_area("Copy this message to customer:", value=msg, height=100)
+
+                if st.button("← Back to Pending Orders"):
+                    get_pending_df.clear()  # force refresh list
+                    st.session_state['page'] = 'Pending Orders'
+                    st.rerun()
             else:
-                st.error("Failed to update.")
+                st.error("Update failed.")
+        else:
+            st.error("Please enter SF number.")
         else:
             st.error("Enter delivery number.")
+            
     if 'success' in st.session_state:
         st.success("Updated!")
         if 'message_lang' not in st.session_state:
@@ -570,6 +598,7 @@ def order_details_page():
         st.markdown('</div>', unsafe_allow_html=True)
         if st.button("Finish"):
             if update_order_status(st.session_state['selected_order'], "Delivered"):
+                ...
                 del st.session_state['success']
                 st.session_state['page'] = 'Pending Orders'
                 st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
