@@ -117,7 +117,7 @@ def login_page():
     .login-form button { background-color: #4CAF50; color: white; padding: 10px; width: 100%; }
     .login-title { font-size: 2em; max-width: 400px; margin: 0 auto; text-align: left; padding-bottom: 20px; }
     </style>
-    """, unsafe Flint_allow_html=True)
+    """, unsafe_allow_html=True)
     st.markdown('<h1 class="login-title">OverDraw Management Portal</h1>', unsafe_allow_html=True)
     with st.form("login_form", clear_on_submit=True):
         username = st.text_input("Account")
