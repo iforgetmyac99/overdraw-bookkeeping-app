@@ -1,4 +1,4 @@
-# odapp.py - FULLY FIXED | 710+ LINES | PENDING ORDERS + 15-MIN TIMEOUT
+# odapp.py - FIXED PENDING ORDERS | 710+ LINES | STATUS TRIM + LOWERCASE
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
@@ -117,7 +117,7 @@ def login_page():
     .login-form button { background-color: #4CAF50; color: white; padding: 10px; width: 100%; }
     .login-title { font-size: 2em; max-width: 400px; margin: 0 auto; text-align: left; padding-bottom: 20px; }
     </style>
-    """, unsafe_allow_html=True)
+    """, unsafe Flint_allow_html=True)
     st.markdown('<h1 class="login-title">OverDraw Management Portal</h1>', unsafe_allow_html=True)
     with st.form("login_form", clear_on_submit=True):
         username = st.text_input("Account")
@@ -134,14 +134,14 @@ def login_page():
             else:
                 st.error("Invalid credentials.")
 
-# === EXTRACT DATA FROM TEMPLATE - FIXED ORDER NUMBER ===
+# === EXTRACT DATA FROM TEMPLATE ===
 def extract_data(template_text):
     sheet = load_journal_sheet()
     all_values = sheet.get_all_values()
     order_num = "OD001"
     if len(all_values) > 1:
         headers = all_values[0]
-        rows = all_values[56]
+        rows = all_values[1:]
         df = pd.DataFrame(rows, columns=headers)
         if 'Order' in df.columns:
             orders = df['Order'].astype(str).str.strip()
@@ -413,7 +413,7 @@ def home_page():
         reset_page_state('Stock Taking')
         st.rerun()
 
-# === PENDING ORDERS - FULLY FIXED ===
+# === PENDING ORDERS - FIXED STATUS TRIM + LOWERCASE ===
 @st.cache_data(show_spinner=False)
 def get_pending_df(_refresh_trigger):
     sheet = load_journal_sheet()
@@ -423,12 +423,13 @@ def get_pending_df(_refresh_trigger):
     headers = all_data[0]
     rows = all_data[1:]
     df = pd.DataFrame(rows, columns=headers)
+    # FULL TRIM + STRIP ALL STRINGS
     df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
     required = ['Order', 'Item', 'Color', 'Size', 'Status']
     if not all(col in df.columns for col in required):
         return pd.DataFrame(columns=required)
-    df = df[required]
-    df['Status'] = df['Status'].str.lower()
+    df = df[required].copy()
+    df['Status'] = df['Status'].astype(str).str.strip().str.lower()
     pending_df = df[df['Status'] == 'pending']
     pending_df = pending_df.dropna(subset=['Order', 'Item'])
     return pending_df[required]
@@ -473,7 +474,7 @@ def pending_orders_page():
                 reset_page_state('Order Details')
                 st.rerun()
     else:
-        st.warning("No pending orders found. Ensure 'Status' is exactly 'Pending' (case-insensitive).")
+        st.warning("No pending orders. Status must be 'Pending' (any case/spaces).")
     if st.session_state.get('page') != 'Pending Orders':
         st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
         reset_page_state(st.session_state['page'])
