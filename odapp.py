@@ -499,89 +499,69 @@ def pending_orders_page():
         st.rerun()
 
 # === ORDER DETAILS PAGE ===
+# === ORDER DETAILS PAGE - FIXED & SIMPLIFIED ===
 def order_details_page():
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("Order Details")
     with col2:
         st.button("Home", key="home_button_details", on_click=go_home)
-    st.button("Return", key="return_button", on_click=lambda: st.session_state.update(page='Pending Orders'))
-    st.markdown("""
-    <style>
-    .stTextInput, .stTextArea { width: 100% !important; }
-    .stDataFrame { width: 100%; overflow-x: auto; }
-    .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
-    .stTextArea textarea { user-select: all; }
-    .item-label { margin-bottom: 0px; font-weight: bold; }
-    .item-container { margin-bottom: 20px; }
-    </style>
-    <script>
-    document.querySelectorAll('textarea').forEach(textarea => {
-        textarea.addEventListener('dblclick', function() {
-            this.select();
-        });
-    });
-    </script>
-    """, unsafe_allow_html=True)
+
+    st.button("← Back", on_click=lambda: st.session_state.update(page="Pending Orders"))
+
     if 'selected_order' not in st.session_state:
         st.error("No order selected.")
         return
+
     sheet = load_journal_sheet()
     all_data = sheet.get_all_values()
     if len(all_data) < 2:
         st.error("No data.")
         return
+
     headers = all_data[0]
     rows = all_data[1:]
     df = pd.DataFrame(rows, columns=headers)
     df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
+
     order_row = df[df['Order'] == st.session_state['selected_order']]
     if order_row.empty:
         st.error("Order not found.")
         return
     order_row = order_row.iloc[0]
-    st.markdown('<div class="item-container"><p class="item-label">Order Number:</p>', unsafe_allow_html=True)
-    st.text_area("", value=order_row.get('Order', ''), height=50, disabled=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<div class="item-container"><p class="item-label">Item, Color, Size:</p>', unsafe_allow_html=True)
-    st.text_area("", value=f"{order_row.get('Item','')} (Color: {order_row.get('Color','')}, Size: {order_row.get('Size','')})", height=50, disabled=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<div class="item-container"><p class="item-label">Carousell ID:</p>', unsafe_allow_html=True)
-    st.text_area("", value=order_row.get('Carousell ID', ''), height=50, disabled=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<div class="item-container"><p class="item-label">Phone:</p>', unsafe_allow_html=True)
-    st.text_area("", value=order_row.get('Phone', ''), height=50, disabled=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<div class="item-container"><p class="item-label">Address:</p>', unsafe_allow_html=True)
-    st.text_area("", value=order_row.get('Address', ''), height=100, disabled=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<div class="item-container"><p class="item-label">Enter SF Delivery Number:</p>', unsafe_allow_html=True)
-    sf_input = st.text_input("", key="sf_input", value=st.session_state.get('sf_input', ""))
-    st.markdown('</div>', unsafe_allow_html=True)
-    # ── Submit SF number → auto mark as Delivered ──
+
+    st.markdown("**Order Number**")
+    st.code(order_row.get('Order', ''), language=None)
+    st.markdown("**Item • Color • Size**")
+    st.code(f"{order_row.get('Item','')} (Color: {order_row.get('Color','')}, Size: {order_row.get('Size','')})")
+    st.markdown("**Carousell ID**")
+    st.code(order_row.get('Carousell ID', ''))
+    st.markdown("**Phone**")
+    st.code(order_row.get('Phone', ''))
+    st.markdown("**Address**")
+    st.code(order_row.get('Address', ''))
+
+    sf_input = st.text_input("Enter SF Delivery Number", key="sf_input")
+
+    # ── ONE-CLICK SUBMIT (saves SF + auto changes status to Delivered) ──
     if st.button("Submit SF Number & Mark as Delivered", type="primary"):
         if not sf_input.strip():
             st.error("Please enter SF number.")
-            st.stop()
-
-        success = update_sf_delivery(st.session_state['selected_order'], sf_input.strip())
-        if success:
-            st.success("SF number saved → Status automatically changed to **Delivered**")
-
-            # Show ready-to-copy message
-            msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
-            st.text_area("Copy message to customer:", value=msg, height=100)
-
-            if st.button("Back to Pending Orders"):
-                get_pending_df.clear()          # refresh the list
-                st.session_state.page = "Pending Orders"
-                st.rerun()
         else:
-            st.error("Failed to update Google Sheet.")
-        else:
-            st.error("Please enter SF number.")
-        else:
-            st.error("Enter delivery number.")
+            if update_sf_delivery(st.session_state['selected_order'], sf_input.strip()):
+                st.success("SF number saved → Status changed to **Delivered**")
+                msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
+                st.text_area("Copy message to customer:", value=msg, height=100)
+                if st.button("Back to Pending Orders"):
+                    get_pending_df.clear()
+                    st.session_state.page = "Pending Orders"
+                    st.rerun()
+            else:
+                st.error("Failed to update Google Sheet.")
+            else:
+                st.error("Please enter SF number.")
+            else:
+                st.error("Enter delivery number.")
             
     if 'success' in st.session_state:
         st.success("Updated!")
