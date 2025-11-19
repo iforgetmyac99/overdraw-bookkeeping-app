@@ -157,27 +157,43 @@ def extract_data(template_text):
 
     item = color = size = name = phone = address = carousell_id = ""
 
-    # Simple line-by-line parsing
-    for line in template_text.split('\n'):
-        l = line.strip()
-        if not l:
-            continue
-        low = l.lower()
+    # Split into lines and clean
+    lines = [line.strip() for line in template_text.split('\n') if line.strip()]
 
-        if any(k in low for k in ['鞋款', 'shoe', 'item']):
-            item = l.split(':', 1)[-1].split('：', 1)[-1].strip()
-        elif any(k in low for k in ['顏色', 'color']):
-            color = l.split(':', 1)[-1].split('：', 1)[-1].strip()
-        elif any(k in low for k in ['碼數', 'size', 'us', 'eu']):
-            m = re.search(r'\d+[.,]?\d*', l)
+    for line in lines:
+        low = line.lower()
+
+        # Shoe name — stop at known keywords to avoid "Worn shoes..." line
+        if any(k in low for k in ['shoe:', '鞋款', 'item:', 'shoes:']) and 'worn' not in low and 'return' not in low:
+            item = line.split(':', 1)[-1].split('：', 1)[-1].strip()
+            # Clean common junk
+            item = re.sub(r'(?i)warm reminder.*|worn shoes.*|refund.*', '', item, flags=re.DOTALL).strip()
+
+        elif any(k in low for k in ['color', '顏色']):
+            color = line.split(':', 1)[-1].split('：', 1)[-1].strip()
+
+        elif any(k in low for k in ['size', '碼數', 'eu', 'us']):
+            m = re.search(r'\d+[.,]?\d*', line)
             size = m.group(0) if m else ""
-        elif any(k in low for k in ['姓名', 'name']):
-            name = l.split(':', 1)[-1].split('：', 1)[-1].strip()
-        elif any(k in low for k in ['電話', 'phone', 'tel']):
-            m = re.search(r'\d{8,}', l)
+
+        elif any(k in low for k in ['name', '姓名']):
+            name = line.split(':', 1)[-1].split('：', 1)[-1].strip()
+
+        elif any(k in low for k in ['phone', '電話', 'tel']):
+            m = re.search(r'\d{8,}', line)
             phone = m.group(0) if m else ""
-        elif any(k in low for k in ['地址', 'address']):
-            address = l.split(':', 1)[-1].split('：', 1)[-1].strip()
+
+        elif any(k in low for k in ['address', '地址']):
+            addr = line.split(':', 1)[-1].split('：', 1)[-1].strip()
+            # Stop address from including payment/reminder lines
+            address = re.sub(r'(?i)payment.*|warm reminder.*|worn shoes.*|refund.*', '', addr).strip()
+
+    # Fallback: if item still empty, try first non-empty line that looks like a product
+    if not item and lines:
+        for line in lines[:5]:  # only check first 5 lines
+            if re.match(r'.*[a-zA-Z].*', line) and len(line) > 10 and 'color' not in line.lower():
+                item = line.strip()
+                break
 
     carousell_id = name or "Unknown"
 
