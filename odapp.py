@@ -136,54 +136,53 @@ def login_page():
 
 # === EXTRACT DATA FROM TEMPLATE - FIXED ORDER NUMBER ===
 # === EXTRACT DATA FROM TEMPLATE - FULLY FIXED ===
+# === EXTRACT DATA FROM TEMPLATE - FINAL & BULLETPROOF ===
 def extract_data(template_text):
     sheet = load_journal_sheet()
     all_values = sheet.get_all_values()
-    
-    # --- Generate next Order number ---
+
+    # --- Generate next ODxxx number ---
     order_num = "OD001"
     if len(all_values) > 1:
-        df = pd.DataFrame(all_values[1:], columns=all_values[0])  # proper DataFrame
-        if 'Order' in df.columns:
-            orders = df['Order'].astype(str).str.strip()
-            od_orders = orders[orders.str.startswith('OD') & (orders.str.len() == 5)]
-            if not od_orders.empty:
-                max_num = max(od_orders, key=lambda x: int(x[2:]))
-                next_num = int(max_num[2:]) + 1
-                order_num = f"OD{next_num:03d}"
+        df = pd.DataFrame(all_values[1:], columns=all_values[0])
+        if 'Order' in df.columns and not df.empty:
+            existing = df['Order'].astype(str).str.strip()
+            od_nums = [int(x[2:]) for x in existing if re.match(r'^OD\d{3}$', x)]
+            if od_nums:
+                order_num = f"OD{max(od_nums)+1:03d}"
 
     date = datetime.now().strftime("%d/%m/%Y")
     status = "Pending"
     sf_delivery_number = ""
 
-    # Default empty values
     item = color = size = name = phone = address = carousell_id = ""
 
-    # English pattern
-    item_en = re.search(r'Shoe:\s*([^\n]+)', template_text, re.IGNORECASE)
-    color_en = re.search(r'Color:\s*([^\n]+)', template_text, re.IGNORECASE)
-    size_en = re.search(r'Size:\s*(\d+[.,]?\d*)', template_text)
-    name_en = re.search(r'Name:\s*([^\n]+)', template_text, re.IGNORECASE)
-    phone_en = re.search(r'Phone:\s*(\d+)', template_text)
-    address_en = re.search(r'Address:\s*(.+)', template_text, re.DOTALL)
+    # Simple line-by-line parsing
+    for line in template_text.split('\n'):
+        l = line.strip()
+        if not l:
+            continue
+        low = l.lower()
 
-    # Chinese pattern
-    item_zh = re.search(r'鞋款[:：]\s*([^\n]+)', template_text)
-    color_zh = re.search(r'顏色[:：]\s*([^\n]+)', template_text)
-    size_zh = re.search(r'碼數[:：]\s*(\d+[.,]?\d*)', template_text)
-    name_zh = re.search(r'姓名[:：]\s*([^\n]+)', template_text)
-    phone_zh = re.search(r'電話[:：]\s*(\d+)', template_text)
-    address_zh = re.search(r'地址[:：]\s*(.+)', template_text, re.DOTALL)
+        if any(k in low for k in ['鞋款', 'shoe', 'item']):
+            item = l.split(':', 1)[-1].split('：', 1)[-1].strip()
+        elif any(k in low for k in ['顏色', 'color']):
+            color = l.split(':', 1)[-1].split('：', 1)[-1].strip()
+        elif any(k in low for k in ['碼數', 'size', 'us', 'eu']):
+            m = re.search(r'\d+[.,]?\d*', l)
+            size = m.group(0) if m else ""
+        elif any(k in low for k in ['姓名', 'name']):
+            name = l.split(':', 1)[-1].split('：', 1)[-1].strip()
+        elif any(k in low for k in ['電話', 'phone', 'tel']):
+            m = re.search(r'\d{8,}', l)
+            phone = m.group(0) if m else ""
+        elif any(k in low for k in ['地址', 'address']):
+            address = l.split(':', 1)[-1].split('：', 1)[-1].strip()
 
-    item = (item_en.group(1).strip() if item_en else (item_zh.group(1).strip() if item_zh else ""))
-    color = (color_en.group(1).strip() if color_en else (color_zh.group(1).strip() if color_zh else ""))
-    size = (size_en.group(1) if size_en else (size_zh.group(1) if size_zh else ""))
-    name = (name_en.group(1).strip() if name_en else (name_zh.group(1).strip() if name_zh else ""))
-    carousell_id = name
-    phone = (phone_en.group(1) if phone_en else (phone_zh.group(1) if phone_zh else ""))
-    address = (address_en.group(1).strip() if address_en else (address_zh.group(1).strip() if address_zh else "")).strip()
+    carousell_id = name or "Unknown"
 
     return order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number
+    
 # === ADD TO SHEET ===
 def add_to_sheet(order_num, date, carousell_id, item, color, size, status, phone, address, sf_delivery_number):
     try:
@@ -615,13 +614,8 @@ def book_keeping_page():
     </script>
     """, unsafe_allow_html=True)
     st.markdown('<h3 style="font-size: 1.4em;">Paste transaction here.</h3>', unsafe_allow_html=True)
-    template_text = st.text_area(
-        "Paste customer message here",
-        value=st.session_state.get('input_text', ""),
-        height=200,
-        key="template_text",
-        label_visibility="collapsed"
-    )
+   template_text = st.text_area("Paste customer message here", value=st.session_state.get('input_text', ""), height=250, key="template_text", label_visibility="collapsed")
+)
     
     if 'show_button' not in st.session_state:
         st.session_state['show_button'] = True
