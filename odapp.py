@@ -558,10 +558,6 @@ def order_details_page():
                     st.rerun()
             else:
                 st.error("Failed to update Google Sheet.")
-            else:
-                st.error("Please enter SF number.")
-            else:
-                st.error("Enter delivery number.")
             
     if 'success' in st.session_state:
         st.success("Updated!")
