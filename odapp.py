@@ -413,22 +413,21 @@ def home_page():
         reset_page_state('Stock Taking')
         st.rerun()
 
-# === PENDING ORDERS - FULLY FIXED ===
 @st.cache_data(show_spinner=False)
 def get_pending_df(_refresh_trigger):
     sheet = load_journal_sheet()
     all_data = sheet.get_all_values()
     if len(all_data) < 2:
-        return pd.DataFrame(columns=['Order', 'Item', 'Color', 'Size', 'Status'])
+        return pd.DataFrame()
     headers = all_data[0]
     rows = all_data[1:]
     df = pd.DataFrame(rows, columns=headers)
     df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
     required = ['Order', 'Item', 'Color', 'Size', 'Status']
     if not all(col in df.columns for col in required):
-        return pd.DataFrame(columns=required)
-    df = df[required]
-    df['Status'] = df['Status'].str.lower()
+        return pd.DataFrame()
+    df = df[required].copy()
+    df['Status'] = df['Status'].astype(str).str.strip().str.lower()
     pending_df = df[df['Status'] == 'pending']
     pending_df = pending_df.dropna(subset=['Order', 'Item'])
     return pending_df[required]
@@ -683,14 +682,18 @@ if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
     login_page()
 else:
     current_time = time.time()
+    
+    # Initialize on first load
     if 'last_activity' not in st.session_state:
         st.session_state['last_activity'] = current_time
-    if current_time - st.session_state['last_activity'] > 900:  # 15 minutes
-        del st.session_state['logged_in']
-        if 'page' in st.session_state:
-            del st.session_state['page']
+    
+    # Update activity on every interaction
+    st.session_state['last_activity'] = current_time
+    
+    # Logout only after 15 minutes of real inactivity
+    if current_time - st.session_state['last_activity'] > 900:  # 15 × 60 = 900 seconds
+        st.session_state.clear()
         st.query_params.clear()
-        reset_page_state('Login')
         st.rerun()
     st.session_state['last_activity'] = current_time
     if 'page' not in st.session_state:
