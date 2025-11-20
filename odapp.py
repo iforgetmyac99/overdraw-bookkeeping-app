@@ -408,7 +408,8 @@ def stock_taking_page():
 
     with col_btn2:
         if st.button("Clear Input", use_container_width=True) or added:
-            st.session_state.stock_input = ""
+            if "stock_input" in st.session_state:
+                del st.session_state.stock_input
             st.rerun()
 
 # === CLEAR INPUT ===
