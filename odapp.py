@@ -462,6 +462,7 @@ def pending_orders_page():
 
     if 'refresh_trigger' not in st.session_state:
         st.session_state['refresh_trigger'] = time.time()
+
     if st.button("Refresh"):
         get_pending_df.clear()
         st.session_state['refresh_trigger'] = time.time()
@@ -469,19 +470,21 @@ def pending_orders_page():
 
     pending_df = get_pending_df(st.session_state['refresh_trigger'])
 
-    if not pending_df.empty:
-        st.write(f"Found {len(pending_df)} pending order(s):")
-        st.dataframe(pending_df[['Order', 'Item', 'Color', 'Size']], use_container_width=True)
+    if pending_df.empty:
+        st.warning("No pending orders found.")
+        return
 
-        for _, row in pending_df.iterrows():
-            label = f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})"
-            copyable_box(label, height=80, key=f"pending_{row['Order']}")
-            if st.button("View Details", key=f"btn_{row['Order']}"):
-                st.session_state['selected_order'] = row['Order']
-                st.session_state.page = 'Order Details'
-                st.rerun()
-    else:
-        st.warning("No pending orders.")
+    st.write(f"Found {len(pending_df)} pending order(s):")
+    st.dataframe(pending_df[['Order', 'Item', 'Color', 'Size']], use_container_width=True)
+
+    # Back to clickable buttons (no copyable text boxes)
+    for _, row in pending_df.iterrows():
+        label = f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})"
+        if st.button(label, key=f"order_{row['Order']}", use_container_width=True):
+            st.session_state['selected_order'] = row['Order']
+            st.session_state.page = 'Order Details'
+            reset_page_state('Order Details')
+            st.rerun()
 
 # === ORDER DETAILS PAGE ===
 def order_details_page():
