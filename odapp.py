@@ -272,15 +272,29 @@ def update_order_status(order_num, status):
 # === QUICK RESPONSES - READS B2:F4 (YOUR EXACT LAYOUT) ===
 # === QUICK RESPONSES - TABS + FULLY WORKING (B2:F4) ===
 def quick_responses_page():
+# === QUICK RESPONSES - TABS + COPY BUTTONS (LIKE OLD VERSIONS) ===
+def quick_responses_page():
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("Quick Responses")
     with col2:
         st.button("Home", key="home_quick", on_click=go_home)
 
+    # Make textareas copy-friendly + copy buttons
+    st.markdown("""
+    <style>
+    textarea { user-select: all !important; }
+    </style>
+    <script>
+    document.querySelectorAll('textarea').forEach(ta => {
+        ta.addEventListener('dblclick', () => ta.select());
+    });
+    </script>
+    """, unsafe_allow_html=True)
+
     try:
         sheet = load_response_sheet()
-        data = sheet.get("B2:F4")          # Your exact layout
+        data = sheet.get("B2:F4")
 
         if len(data) < 3:
             st.error("Response sheet missing data (need B2:F4)")
@@ -290,12 +304,9 @@ def quick_responses_page():
         zh_row  = data[1]
         en_row  = data[2]
 
-        # Find column indices
         def idx(name):
-            try:
-                return headers.index(name.lower())
-            except:
-                return -1
+            try: return headers.index(name.lower())
+            except: return -1
 
         enq = idx("enquiry")
         ord_ = idx("order")
@@ -303,37 +314,38 @@ def quick_responses_page():
         suc = idx("success")
 
         if -1 in (enq, ord_, pay, suc):
-            st.error("Missing required columns (Enquiry / Order / Payment / Success)")
+            st.error("Missing required columns")
             return
 
-        # Build responses
-        chinese = {
-            "Enquiry": zh_row[enq].strip(),
-            "Order":   zh_row[ord_].strip(),
-            "Payment": zh_row[pay].strip(),
-            "Success": zh_row[suc].strip(),
-        }
-        english = {
-            "Enquiry": en_row[enq].strip(),
-            "Order":   en_row[ord_].strip(),
-            "Payment": en_row[pay].strip(),
-            "Success": en_row[suc].strip(),
-        }
+        chinese = {"Enquiry": zh_row[enq].strip(), "Order": zh_row[ord_].strip(),
+                   "Payment": zh_row[pay].strip(), "Success": zh_row[suc].strip()}
+        english = {"Enquiry": en_row[enq].strip(), "Order": en_row[ord_].strip(),
+                   "Payment": en_row[pay].strip(), "Success": en_row[suc].strip()}
 
-        # === TABS LIKE RECORD CHECKING ===
         tab_zh, tab_en = st.tabs(["中文", "English"])
 
+        def copy_text(label, text, key_prefix):
+            col1, col2 = st.columns([10, 1])
+            with col1:
+                st.text_area("", value=text, height=150 if "Success" in label else 180 if "Enquiry" in label else 200 if "Order" in label else 120,
+                             key=f"{key_prefix}_{label}", label_visibility="collapsed")
+            with col2:
+                st.write("")  # spacer
+                if st.button("Copy", key=f"copy_{key_prefix}_{label}"):
+                    st.code(text)  # puts text in clipboard automatically in most browsers
+                    st.toast("Copied!", icon="✅")
+
         with tab_zh:
-            st.markdown("#### Enquiry"); st.text_area("", value=chinese["Enquiry"], height=180, key="zh_enq", label_visibility="collapsed")
-            st.markdown("#### Order");   st.text_area("", value=chinese["Order"],   height=200, key="zh_ord", label_visibility="collapsed")
-            st.markdown("#### Payment"); st.text_area("", value=chinese["Payment"], height=120, key="zh_pay", label_visibility="collapsed")
-            st.markdown("#### Success"); st.text_area("", value=chinese["Success"], height=150, key="zh_suc", label_visibility="collapsed")
+            st.markdown("#### Enquiry");  copy_text("Enquiry", chinese["Enquiry"], "zh")
+            st.markdown("#### Order");    copy_text("Order",   chinese["Order"],   "zh")
+            st.markdown("#### Payment");  copy_text("Payment", chinese["Payment"], "zh")
+            st.markdown("#### Success");  copy_text("Success", chinese["Success"], "zh")
 
         with tab_en:
-            st.markdown("#### Enquiry"); st.text_area("", value=english["Enquiry"], height=180, key="en_enq", label_visibility="collapsed")
-            st.markdown("#### Order");   st.text_area("", value=english["Order"],   height=200, key="en_ord", label_visibility="collapsed")
-            st.markdown("#### Payment"); st.text_area("", value=english["Payment"], height=120, key="en_pay", label_visibility="collapsed")
-            st.markdown("#### Success"); st.text_area("", value=english["Success"], height=150, key="en_suc", label_visibility="collapsed")
+            st.markdown("#### Enquiry");  copy_text("Enquiry", english["Enquiry"], "en")
+            st.markdown("#### Order");    copy_text("Order",   english["Order"],   "en")
+            st.markdown("#### Payment");  copy_text("Payment", english["Payment"], "en")
+            st.markdown("#### Success");  copy_text("Success", english["Success"], "en")
 
     except Exception as e:
         st.error("Failed to load Quick Responses")
