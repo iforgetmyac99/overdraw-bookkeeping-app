@@ -447,8 +447,6 @@ def pending_orders_page():
         st.rerun()
 
 # === ORDER DETAILS PAGE ===
-# === ORDER DETAILS PAGE - FIXED & SIMPLIFIED ===
-# === ORDER DETAILS PAGE - BACK BUTTONS FIXED ===
 def order_details_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -456,11 +454,8 @@ def order_details_page():
     with col2:
         st.button("Home", key="home_details", on_click=go_home)
 
-    # ← Back button at top (always visible)
-    if st.button("← Back"):
-        st.session_state.page = "Pending Orders"
-        get_pending_df.clear()
-        st.rerun()
+    # ← Top back button (always visible, works exactly like Home button)
+    st.button("← Pending Orders", on_click=go_back_to_pending, type="secondary")
 
     if 'selected_order' not in st.session_state:
         st.error("No order selected.")
@@ -468,7 +463,8 @@ def order_details_page():
 
     sheet = load_journal_sheet()
     all_data = sheet.get_all_values()
-    if len(all_data) < 2: return
+    if len(all_data) < 2:
+        return
 
     headers = all_data[0]
     df = pd.DataFrame(all_data[1:], columns=headers)
@@ -490,16 +486,11 @@ def order_details_page():
 
         if update_sf_delivery(st.session_state['selected_order'], sf_input.strip()):
             st.success("SF number saved → Status changed to **Delivered**")
-
             msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
             copyable_box(msg, height=110)
 
-            st.button(
-                "← Back to Pending Orders",
-                type="primary",
-                use_container_width=True,
-                on_click=go_back_to_pending
-            )
+            # Final back button after success – same behavior
+            st.button("← Back to Pending Orders", on_click=go_back_to_pending, type="primary", use_container_width=True)
         else:
             st.error("Update failed.")
 
