@@ -227,16 +227,6 @@ def quick_responses_page():
     with col2:
         st.button("Home", key="home_quick", on_click=go_home)
 
-    def copy_box(text, height=120):
-        st.text_area(
-            "", 
-            value=text.strip(), 
-            height=height,
-            key=f"copy_{hash(text)}",
-            label_visibility="collapsed",
-            help="Click the copy icon to copy"
-        )
-
     try:
         sheet = load_response_sheet()
         data = sheet.get("B2:F4")
@@ -248,10 +238,15 @@ def quick_responses_page():
         zh_row, en_row = data[1], data[2]
 
         def get_col(name):
-            try: return headers.index(name.lower())
-            except: return -1
+            try:
+                return headers.index(name.lower())
+            except ValueError:
+                return -1
 
-        e, o, p, s = get_col("enquiry"), get_col("order"), get_col("payment"), get_col("success")
+        e = get_col("enquiry")
+        o = get_col("order")
+        p = get_col("payment")
+        s = get_col("success")
         if -1 in (e, o, p, s):
             st.error("Missing columns in Response sheet")
             return
@@ -262,15 +257,30 @@ def quick_responses_page():
 
         tab_zh, tab_en = st.tabs(["中文", "English"])
 
+        # Unique static keys + help → perfect clipboard icon every time
         with tab_zh:
-            for title, text in zip(titles, zh):
+            for i, (title, text) in enumerate(zip(titles, zh)):
                 st.markdown(f"**{title}**")
-                copy_box(text, height=160 if "Enquiry" in title else 180 if "Order" in title else 130)
+                st.text_area(
+                    "",
+                    value=text.strip(),
+                    height=160 if i == 0 else 180 if i == 1 else 130,
+                    key=f"zh_response_{i}",           # ← static unique key
+                    label_visibility="collapsed",
+                    help="Click the clipboard icon to copy"
+                )
 
         with tab_en:
-            for title, text in zip(titles, en):
+            for i, (title, text) in enumerate(zip(titles, en)):
                 st.markdown(f"**{title}**")
-                copy_box(text, height=160 if "Enquiry" in title else 180 if "Order" in title else 130)
+                st.text_area(
+                    "",
+                    value=text.strip(),
+                    height=160 if i == 0 else 180 if i == 1 else 130,
+                    key=f"en_response_{i}",           # ← static unique key
+                    label_visibility="collapsed",
+                    help="Click the clipboard icon to copy"
+                )
 
     except Exception as e:
         st.error("Failed to load responses")
