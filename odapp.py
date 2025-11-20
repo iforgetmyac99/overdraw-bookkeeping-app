@@ -51,6 +51,15 @@ def reset_page_state(page):
         st.session_state['quick_response_lang'] = None
     st.session_state['last_page'] = page
 
+def go_back_to_pending():
+    get_pending_df.clear()
+    st.session_state.page = "Pending Orders"
+    st.rerun()
+def go_back_to_pending():
+    get_pending_df.clear()  # clear cache so list refreshes
+    st.session_state.page = "Pending Orders"
+    st.rerun()
+    
 def go_home():
     st.session_state['page'] = 'Home'
     st.query_params.update({"logged_in": "true", "page": "Home"})
@@ -478,19 +487,28 @@ def order_details_page():
 
     sf_input = st.text_input("Enter SF Delivery Number", key="sf_input")
 
-    if st.button("Submit SF Number & Mark as Delivered", type="primary"):
-        if sf_input.strip():
-            if update_sf_delivery(st.session_state['selected_order'], sf_input.strip()):
-                st.success("SF number saved → Status changed to **Delivered**")
-                msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
-                copyable_box(msg, height=110)
-                
-                if st.button("← Back to Pending Orders"):
-                    get_pending_df.clear()
-                    st.session_state.page = "Pending Orders"
-                    st.rerun()
-            else:
-                st.error("Update failed.")
+    if st.button("Submit SF Number & Mark as Delivered", type="primary", use_container_width=True):
+    if not sf_input.strip():
+        st.error("Enter SF number.")
+        st.stop()
+
+    if update_sf_delivery(st.session_state['selected_order'], sf_input.strip()):
+        st.success("SF number saved → Status changed to **Delivered**")
+
+        msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
+        
+        # This now shows the clipboard icon perfectly
+        copyable_box(msg, height=110)
+
+        # One single, perfectly working back button
+        st.button(
+            "← Back to Pending Orders",
+            type="primary",
+            use_container_width=True,
+            on_click=go_back_to_pending
+        )
+    else:
+        st.error("Update failed.")
         else:
             st.error("Enter SF number.")
 
