@@ -227,48 +227,57 @@ def quick_responses_page():
 
     try:
         sheet = load_response_sheet()
-        data = sheet.get("B2:F4")           # B2:F4 = 3 rows × 5 columns
+        data = sheet.get("B2:F4")
         if not data or len(data) < 3:
-            st.error("Response sheet missing data (need at least 3 rows in B2:F4)")
+            st.error("Response sheet missing data")
             return
 
         headers = [h.strip().lower() for h in data[0]]
-        zh_row  = data[1]   # row 2 → Chinese
-        en_row  = data[2]   # row 3 → English
+        zh_row, en_row = data[1], data[2]
 
-        def col_index(name):
+        def idx(name):
             try: return headers.index(name.lower())
-            except ValueError: return -1
+            except: return -1
 
-        e = col_index("enquiry")
-        o = col_index("order")
-        p = col_index("payment")
-        s = col_index("success")
-        if -1 in (e, o, p, s):
-            st.error("Missing required columns (Enquiry / Order / Payment / Success)")
+        cols = {name: idx(name) for name in ["enquiry", "order", "payment", "success"]}
+        if -1 in cols.values():
+            st.error("Missing column: Enquiry / Order / Payment / Success")
             return
 
-        zh_texts = [zh_row[e], zh_row[o], zh_row[p], zh_row[s]]
-        en_texts = [en_row[e], en_row[o], en_row[p], en_row[s]]
-        titles   = ["Enquiry", "Order", "Payment", "Success"]
+        titles = ["Enquiry", "Order", "Payment", "Success"]
+        heights = [160, 180, 130, 130]
 
         tab_zh, tab_en = st.tabs(["中文", "English"])
 
         with tab_zh:
-            for i, text in enumerate(zh_texts):
-                st.markdown(f"**{titles[i]}**")
-                copyable_box(text.strip(), height=160 if i==0 else 180 if i==1 else 130,
-                             key=f"zh_{i}")
+            for i, title in enumerate(titles):
+                text = zh_row[cols[title.lower()]].strip()
+                st.markdown(f"**{title}**")
+                st.text_area(
+                    label="",
+                    value=text,
+                    height=heights[i],
+                    key=f"zh_quick_{i}",           # ← UNIQUE KEY = NO ERROR
+                    label_visibility="collapsed",
+                    help="Click the clipboard icon to copy"
+                )
 
         with tab_en:
-            for i, text in enumerate(en_texts):
-                st.markdown(f"**{titles[i]}**")
-                copyable_box(text.strip(), height=160 if i==0 else 180 if i==1 else 130,
-                             key=f"en_{i}")
+            for i, title in enumerate(titles):
+                text = en_row[cols[title.lower()]].strip()
+                st.markdown(f"**{title}**")
+                st.text_area(
+                    label="",
+                    value=text,
+                    height=heights[i],
+                    key=f"en_quick_{i}",           # ← UNIQUE KEY = NO ERROR
+                    label_visibility="collapsed",
+                    help="Click the clipboard icon to copy"
+                )
 
     except Exception as e:
         st.error("Failed to load responses")
-        st.code(str(e))
+        st.expander("Debug info").code(str(e))
         
 # === STOCK TAKING PAGE ===
 def stock_taking_page():
