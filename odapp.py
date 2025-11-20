@@ -7,7 +7,6 @@ from datetime import datetime
 import time
 
 # === Copybox Helper Function Start === #
-# === Copybox Helper Function – FIXED with visible clipboard icon ===
 def copyable_box(text: str, height: int = 150, key=None):
     st.text_area(
         "",
@@ -15,7 +14,7 @@ def copyable_box(text: str, height: int = 150, key=None):
         height=height,
         key=key,
         label_visibility="collapsed",
-        help="Click the clipboard icon to copy"   # ← THIS LINE IS REQUIRED
+        help="Click the clipboard icon to copy"
     )
 # === Copybox Helper Function End === #
 
@@ -219,7 +218,6 @@ def update_order_status(order_num, status):
 
 
 # === QUICK RESPONSES === #
-# === QUICK RESPONSES - EXACT STYLE AS YOUR PHOTO ===
 def quick_responses_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -238,15 +236,10 @@ def quick_responses_page():
         zh_row, en_row = data[1], data[2]
 
         def get_col(name):
-            try:
-                return headers.index(name.lower())
-            except ValueError:
-                return -1
+            try: return headers.index(name.lower())
+            except: return -1
 
-        e = get_col("enquiry")
-        o = get_col("order")
-        p = get_col("payment")
-        s = get_col("success")
+        e, o, p, s = get_col("enquiry"), get_col("order"), get_col("payment"), get_col("success")
         if -1 in (e, o, p, s):
             st.error("Missing columns in Response sheet")
             return
@@ -257,30 +250,15 @@ def quick_responses_page():
 
         tab_zh, tab_en = st.tabs(["中文", "English"])
 
-        # Unique static keys + help → perfect clipboard icon every time
         with tab_zh:
-            for i, (title, text) in enumerate(zip(titles, zh)):
-                st.markdown(f"**{title}**")
-                st.text_area(
-                    "",
-                    value=text.strip(),
-                    height=160 if i == 0 else 180 if i == 1 else 130,
-                    key=f"zh_response_{i}",           # ← static unique key
-                    label_visibility="collapsed",
-                    help="Click the clipboard icon to copy"
-                )
+            for i, text in enumerate(zh):
+                st.markdown(f"**{titles[i]}**")
+                copyable_box(text.strip(), height=160 if i == 0 else 180 if i == 1 else 130)
 
         with tab_en:
-            for i, (title, text) in enumerate(zip(titles, en)):
-                st.markdown(f"**{title}**")
-                st.text_area(
-                    "",
-                    value=text.strip(),
-                    height=160 if i == 0 else 180 if i == 1 else 130,
-                    key=f"en_response_{i}",           # ← static unique key
-                    label_visibility="collapsed",
-                    help="Click the clipboard icon to copy"
-                )
+            for i, text in enumerate(en):
+                st.markdown(f"**{titles[i]}**")
+                copyable_box(text.strip(), height=160 if i == 0 else 180 if i == 1 else 130)
 
     except Exception as e:
         st.error("Failed to load responses")
