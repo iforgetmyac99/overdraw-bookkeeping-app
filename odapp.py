@@ -267,6 +267,7 @@ def update_order_status(order_num, status):
 
 # === QUICK RESPONSES PAGE ===
 # === QUICK RESPONSES - FROM GOOGLE SHEET "Response" ===
+# === QUICK RESPONSES - FROM GOOGLE SHEET "Response" - FIXED DUPLICATE HEADERS ===
 def quick_responses_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -274,23 +275,40 @@ def quick_responses_page():
     with col2:
         st.button("Home", key="home_quick", on_click=go_home)
 
-    sheet = load_response_sheet()
-    data = sheet.get_all_records()
-    df = pd.DataFrame(data)
+    try:
+        sheet = load_response_sheet()
+        # Fix: Force headers and skip bad rows
+        records = sheet.get_all_records(expected_headers=['Language', 'Enquiry', 'Order', 'Payment', 'Success'])
+        df = pd.DataFrame(records)
 
-    lang = st.radio("Language", ["中文", "English"], horizontal=True, key="quick_lang")
+        if df.empty:
+            st.error("Response sheet is empty or has no valid data.")
+            return
 
-    row = df[df['Language'] == lang].iloc[0]
+        # Clean and deduplicate just in case
+        df = df.drop_duplicates(subset=['Language']).set_index('Language')
 
-    st.markdown("#### Enquiry")
-    st.text_area("", value=row['Enquiry'], height=150, key="enq", label_visibility="collapsed")
-    st.markdown("#### Order")
-    st.text_area("", value=row['Order'], height=150, key="ord", label_visibility="collapsed")
-    st.markdown("#### Payment")
-    st.text_area("", value=row['Payment'], height=100, key="pay", label_visibility="collapsed")
-    st.markdown("#### Success")
-    st.text_area("", value=row['Success'], height=120, key="succ", label_visibility="collapsed")
+        lang = st.radio("Language", ["中文", "English"], horizontal=True, key="quick_lang")
 
+        if lang not in df.index:
+            st.error(f"No data found for language: {lang}")
+            return
+
+        row = df.loc[lang]
+
+        st.markdown("#### Enquiry")
+        st.text_area("", value=row['Enquiry'], height=150, key="enq", label_visibility="collapsed")
+        st.markdown("#### Order")
+        st.text_area("", value=row['Order'], height=150, key="ord", label_visibility="collapsed")
+        st.markdown("#### Payment")
+        st.text_area("", value=row['Payment'], height=100, key="pay", label_visibility="collapsed")
+        st.markdown("#### Success")
+        st.text_area("", value=row['Success'], height=120, key="succ", label_visibility="collapsed")
+
+    except Exception as e:
+        st.error("Failed to load Quick Responses. Check your 'Response' sheet headers.")
+        st.code(str(e))
+        
 # === STOCK TAKING PAGE ===
 def stock_taking_page():
     col1, col2 = st.columns([8, 1])
@@ -610,7 +628,8 @@ def load_response_sheet():
     scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
     client = gspread.authorize(creds)
-    return client.open_by_key('10CLEJyH7LGkZrVjc8EiicJ2PCBY_se7gALChd_YyaCg').worksheet("Response")
+    sheet = client.open_by_key('10CLEJyH7LGkZrVjc8EiicJ2PCBY_se7gALChd_YyaCg').worksheet("Response")
+    return sheet
     
 # === MAIN ROUTER ===
 query_params = st.query_params.to_dict()
