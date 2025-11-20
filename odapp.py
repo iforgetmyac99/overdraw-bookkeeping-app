@@ -265,14 +265,9 @@ def update_order_status(order_num, status):
     sheet.update_cell(row_idx[0] + 2, col_idx, status)
     return True
 
-# === QUICK RESPONSES PAGE ===
-# === QUICK RESPONSES - FROM GOOGLE SHEET "Response" ===
-# === QUICK RESPONSES - FROM GOOGLE SHEET "Response" - FIXED DUPLICATE HEADERS ===
-# === QUICK RESPONSES - FINAL FIXED (works no matter header order or case) ===
-# === QUICK RESPONSES - READS B2:F4 (YOUR EXACT LAYOUT) ===
-# === QUICK RESPONSES - TABS + FULLY WORKING (B2:F4) ===
-def quick_responses_page():
+
 # === QUICK RESPONSES - TABS + COPY BUTTONS (LIKE OLD VERSIONS) ===
+# === QUICK RESPONSES - TABS + COPY BUTTONS (FIXED INDENTATION) ===
 def quick_responses_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -305,8 +300,10 @@ def quick_responses_page():
         en_row  = data[2]
 
         def idx(name):
-            try: return headers.index(name.lower())
-            except: return -1
+            try:
+                return headers.index(name.lower())
+            except:
+                return -1
 
         enq = idx("enquiry")
         ord_ = idx("order")
@@ -317,22 +314,30 @@ def quick_responses_page():
             st.error("Missing required columns")
             return
 
-        chinese = {"Enquiry": zh_row[enq].strip(), "Order": zh_row[ord_].strip(),
-                   "Payment": zh_row[pay].strip(), "Success": zh_row[suc].strip()}
-        english = {"Enquiry": en_row[enq].strip(), "Order": en_row[ord_].strip(),
-                   "Payment": en_row[pay].strip(), "Success": en_row[suc].strip()}
+        chinese = {
+            "Enquiry": zh_row[enq].strip(),
+            "Order":   zh_row[ord_].strip(),
+            "Payment": zh_row[pay].strip(),
+            "Success": zh_row[suc].strip()
+        }
+        english = {
+            "Enquiry": en_row[enq].strip(),
+            "Order":   en_row[ord_].strip(),
+            "Payment": en_row[pay].strip(),
+            "Success": en_row[suc].strip()
+        }
 
         tab_zh, tab_en = st.tabs(["中文", "English"])
 
         def copy_text(label, text, key_prefix):
             col1, col2 = st.columns([10, 1])
             with col1:
-                st.text_area("", value=text, height=150 if "Success" in label else 180 if "Enquiry" in label else 200 if "Order" in label else 120,
-                             key=f"{key_prefix}_{label}", label_visibility="collapsed")
+                height = 180 if "Enquiry" in label else 200 if "Order" in label else 120 if "Payment" in label else 150
+                st.text_area("", value=text, height=height, key=f"{key_prefix}_{label}", label_visibility="collapsed")
             with col2:
-                st.write("")  # spacer
+                st.write("")
                 if st.button("Copy", key=f"copy_{key_prefix}_{label}"):
-                    st.code(text)  # puts text in clipboard automatically in most browsers
+                    st.code(text)
                     st.toast("Copied!", icon="✅")
 
         with tab_zh:
