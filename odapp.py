@@ -55,10 +55,6 @@ def go_back_to_pending():
     get_pending_df.clear()
     st.session_state.page = "Pending Orders"
     st.rerun()
-def go_back_to_pending():
-    get_pending_df.clear()  # clear cache so list refreshes
-    st.session_state.page = "Pending Orders"
-    st.rerun()
     
 def go_home():
     st.session_state['page'] = 'Home'
