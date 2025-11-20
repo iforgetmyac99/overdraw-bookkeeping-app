@@ -250,15 +250,25 @@ def quick_responses_page():
 
         tab_zh, tab_en = st.tabs(["中文", "English"])
 
+        # Chinese tab – with unique keys
         with tab_zh:
             for i, text in enumerate(zh):
                 st.markdown(f"**{titles[i]}**")
-                copyable_box(text.strip(), height=160 if i == 0 else 180 if i == 1 else 130)
+                copyable_box(
+                    text.strip(),
+                    height=160 if i == 0 else 180 if i == 1 else 130,
+                    key=f"zh_copybox_{i}"          # ← unique key = no duplicate ID error
+                )
 
+        # English tab – with unique keys
         with tab_en:
             for i, text in enumerate(en):
                 st.markdown(f"**{titles[i]}**")
-                copyable_box(text.strip(), height=160 if i == 0 else 180 if i == 1 else 130)
+                copyable_box(
+                    text.strip(),
+                    height=160 if i == 0 else 180 if i == 1 else 130,
+                    key=f"en_copybox_{i}"          # ← unique key = no duplicate ID error
+                )
 
     except Exception as e:
         st.error("Failed to load responses")
