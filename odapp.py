@@ -267,12 +267,23 @@ def update_order_status(order_num, status):
     return True
 
 # === QUICK RESPONSES - TABS + NATIVE TINY COPY ICON (100% CLEAN) ===
+# === QUICK RESPONSES - NATIVE COPY BUTTON (TINY CLIPBOARD ICON) ===
 def quick_responses_page():
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("Quick Responses")
     with col2:
         st.button("Home", key="home_quick", on_click=go_home)
+
+    def copyable_box(text, height=150, key=None):
+        st.text_area(
+            "", 
+            value=text, 
+            height=height, 
+            key=key,
+            label_visibility="collapsed",
+            help="Click the 📋 icon to copy"
+        )
 
     try:
         sheet = load_response_sheet()
@@ -282,68 +293,36 @@ def quick_responses_page():
             return
 
         headers = [h.strip().lower() for h in data[0]]
-        zh_row  = data[1]
-        en_row  = data[2]
+        zh_row, en_row = data[1], data[2]
 
         def idx(name):
-            try:
-                return headers.index(name.lower())
-            except:
-                return -1
+            try: return headers.index(name.lower())
+            except: return -1
 
         enq = idx("enquiry")
         ord_ = idx("order")
         pay = idx("payment")
         suc = idx("success")
-
         if -1 in (enq, ord_, pay, suc):
             st.error("Missing required columns (Enquiry/Order/Payment/Success)")
             return
 
-        chinese = {
-            "Enquiry": zh_row[enq].strip(),
-            "Order":   zh_row[ord_].strip(),
-            "Payment": zh_row[pay].strip(),
-            "Success": zh_row[suc].strip()
-        }
-        english = {
-            "Enquiry": en_row[enq].strip(),
-            "Order":   en_row[ord_].strip(),
-            "Payment": en_row[pay].strip(),
-            "Success": en_row[suc].strip()
-        }
+        zh = {k: v.strip() for k, v in zip(["Enquiry","Order","Payment","Success"], [zh_row[enq], zh_row[ord_], zh_row[pay], zh_row[suc]])}
+        en = {k: v.strip() for k, v in zip(["Enquiry","Order","Payment","Success"], [en_row[enq], en_row[ord_], en_row[pay], en_row[suc]])}
 
         tab_zh, tab_en = st.tabs(["中文", "English"])
 
-        def copyable_textarea(text, height=150, key=None):
-            st.text_area(
-                "", 
-                value=text, 
-                height=height, 
-                key=key,
-                label_visibility="collapsed",
-                help="Click the clipboard icon to copy"
-            )
-
         with tab_zh:
-            st.markdown("#### Enquiry")
-            copyable_textarea(chinese["Enquiry"], height=180, key="zh_enq")
-            st.markdown("#### Order")
-            copyable_textarea(chinese["Order"],   height=200, key="zh_ord")
-            st.markdown("#### Payment")
-            copyable_textarea(chinese["Payment"], height=120, key="zh_pay")
-            st.markdown("#### Success")
-            copyable_textarea(chinese["Success"], height=150, key="zh_suc")
+            st.markdown("#### Enquiry");  copyable_box(zh["Enquiry"], 180, "zh_enq")
+            st.markdown("#### Order");    copyable_box(zh["Order"], 220, "zh_ord")
+            st.markdown("#### Payment");  copyable_box(zh["Payment"], 130, "zh_pay")
+            st.markdown("#### Success");  copyable_box(zh["Success"], 160, "zh_suc")
 
         with tab_en:
-            st.markdown("#### Enquiry")
-            copyable_textarea(english["Enquiry"], height=180, key="en_enq")
-            st.markdown("#### Order")
-            copyable_textarea(english["Order"],   height=200, key="en_ord")
-            st.markdown("#### Payment")
-            copyable_textarea(english["Payment"], height=120, key="en_pay")
-            st.markdown("#### Success")
-            copyable_textarea(english["Success"], height=150, key="en_suc")
+            st.markdown("#### Enquiry");  copyable_box(en["Enquiry"], 180, "en_enq")
+            st.markdown("#### Order");    copyable_box(en["Order"], 220, "en_ord")
+            st.markdown("#### Payment");  copyable_box(en["Payment"], 130, "en_pay")
+            st.markdown("#### Success");  copyable_box(en["Success"], 160, "en_suc")
 
     except Exception as e:
         st.error("Failed to load Quick Responses")
