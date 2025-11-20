@@ -336,12 +336,11 @@ def stock_taking_page():
             next_id += 1
 
         st.success(f"Successfully added {len(entries)} item(s)!")
-        # Auto-clear input after success
-        st.session_state.stock_input = ""
+        del st.session_state.stock_input   # Safe clear
         st.rerun()
 
     if st.button("Clear", use_container_width=True):
-        st.session_state.stock_input = ""
+        del st.session_state.stock_input
         st.rerun()
 
 # === CLEAR INPUT ===
