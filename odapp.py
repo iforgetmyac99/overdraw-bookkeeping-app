@@ -8,68 +8,17 @@ import re
 from datetime import datetime
 import time
 
-# === DEFAULT QUICK RESPONSES ===
-DEFAULT_RESPONSES = {
-    'zh': {
-        'express_order': """快速落單
-        
-一按「出價」同埋留低以下資料就可以快速落單喇
-
-鞋款：
-顏色：
-碼數：
-姓名：
-電話：
-地址：
-付款方式（FPS / Payme / Alipay）：
-
-溫馨提示:
-貨品如非質量問題 不設退換
-收貨後請先作檢查
-已經穿著嘅鞋將不接受退換處理""",
-        'payment_method': """FPS ID
-111780946
-Yu Txx Lxx
-
-Payme
-Tap to PayMe!
-https://payme.hsbc/overdraw9""",
-        'completed_order': """唔該曬
-大約五至七日左右到貨
-寄出後會有順豐寄件編號比翻你嘅
-到時可以用順豐APP查詢寄件狀況
-多謝支持""",
-        'more_products': """更多款式請入profile挑選或DM查詢
-付款後七至十日到貨
-貨品會經由順豐寄到客人指定地址"""
-    },
-    'en': {
-        'express_order': """Express Order
-Please fill in the information below and click "Make Offer" button for placing order
-Shoe:
-Color:
-Size:
-Name:
-Phone:
-Address:
-Payment (FPS/Alipay/Payme):
-Warm Reminder
-Refund / Exchange is only facilitated for shoes with quality issue
-Please check when receiving the delivery
-Worn shoes are not accepted as return""",
-        'payment_method': """FPS ID
-111780946
-Yu Txx Lxx
-Payme
-Tap to PayMe!
-https://payme.hsbc/overdraw9""",
-        'completed_order': """Well received and Thank you for the order!
-Pre-Ordered shoes take around 5 - 7 days for stock arrival.
-SF Delivery Number will be provided after shipment being sent.
-Delivery status can be checked with the provided SF Delivery number.
-Thank you for your support and patience."""
-    }
-}
+# === Copybox Helper Function Start === #
+def copyable_box(text: str, height: int = 150, key=None):
+    st.text_area(
+        "",
+        value=text,
+        height=height,
+        key=key,
+        label_visibility="collapsed",
+        help="Click the clipboard icon to copy"
+    )
+# === Copybox Helper Function End === #
 
 # === GOOGLE SHEETS ===
 @st.cache_resource
@@ -135,8 +84,6 @@ def login_page():
             else:
                 st.error("Invalid credentials.")
 
-# === EXTRACT DATA FROM TEMPLATE - FIXED ORDER NUMBER ===
-# === EXTRACT DATA FROM TEMPLATE - FULLY FIXED ===
 # === EXTRACT DATA FROM TEMPLATE - FINAL & BULLETPROOF ===
 def extract_data(template_text):
     sheet = load_journal_sheet()
@@ -268,22 +215,13 @@ def update_order_status(order_num, status):
 
 # === QUICK RESPONSES - TABS + NATIVE TINY COPY ICON (100% CLEAN) ===
 # === QUICK RESPONSES - NATIVE COPY BUTTON (TINY CLIPBOARD ICON) ===
+# === QUICK RESPONSES - UNIFIED COPYABLE TEXTBOX ===
 def quick_responses_page():
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("Quick Responses")
     with col2:
         st.button("Home", key="home_quick", on_click=go_home)
-
-    def copyable_box(text, height=150, key=None):
-        st.text_area(
-            "", 
-            value=text, 
-            height=height, 
-            key=key,
-            label_visibility="collapsed",
-            help="Click the 📋 icon to copy"
-        )
 
     try:
         sheet = load_response_sheet()
@@ -299,16 +237,13 @@ def quick_responses_page():
             try: return headers.index(name.lower())
             except: return -1
 
-        enq = idx("enquiry")
-        ord_ = idx("order")
-        pay = idx("payment")
-        suc = idx("success")
-        if -1 in (enq, ord_, pay, suc):
-            st.error("Missing required columns (Enquiry/Order/Payment/Success)")
+        cols = ["enquiry", "order", "payment", "success"]
+        if any(idx(c) == -1 for c in cols):
+            st.error("Missing required columns")
             return
 
-        zh = {k: v.strip() for k, v in zip(["Enquiry","Order","Payment","Success"], [zh_row[enq], zh_row[ord_], zh_row[pay], zh_row[suc]])}
-        en = {k: v.strip() for k, v in zip(["Enquiry","Order","Payment","Success"], [en_row[enq], en_row[ord_], en_row[pay], en_row[suc]])}
+        zh = {c.title(): zh_row[idx(c)].strip() for c in cols}
+        en = {c.title(): en_row[idx(c)].strip() for c in cols}
 
         tab_zh, tab_en = st.tabs(["中文", "English"])
 
@@ -329,7 +264,6 @@ def quick_responses_page():
         st.code(str(e))
         
 # === STOCK TAKING PAGE ===
-# === STOCK TAKING PAGE - SUPPORTS COST + PRICE ===
 def stock_taking_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -407,9 +341,8 @@ def stock_taking_page():
             added = True
 
     with col_btn2:
-        if st.button("Clear Input", use_container_width=True) or added:
-            if "stock_input" in st.session_state:
-                del st.session_state.stock_input
+        if st.button("Clear", use_container_width=True) or added:
+            st.session_state["stock_input"] = ""
             st.rerun()
 
 # === CLEAR INPUT ===
