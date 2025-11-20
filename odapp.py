@@ -281,22 +281,23 @@ def stock_taking_page():
     st.markdown("**Enter: Product → Cost → Price (newline or tab-separated)**")
     st.code("Nike Air Force\n280\n580\n\nAdidas Ultraboost[TAB]320[TAB]680", language="text")
 
+    # Fixed: force empty when no value in session_state
     input_text = st.text_area(
         "",
+        value=st.session_state.get("stock_input", ""),  # This line fixes Clear button
         height=250,
         key="stock_input",
         label_visibility="collapsed",
         placeholder="Paste or type here..."
     )
 
-    # Buttons on the same line
+    # Buttons on same line
     col_btn1, col_btn2 = st.columns([2, 1])
     with col_btn1:
         add_pressed = st.button("Add to Stock Sheet", type="primary", use_container_width=True, key="add_stock")
     with col_btn2:
         clear_pressed = st.button("Clear & Refresh", type="secondary", use_container_width=True, key="clear_stock")
 
-    # Add to sheet
     if add_pressed:
         lines = [l.strip() for l in input_text.splitlines() if l.strip()]
         if not lines:
@@ -339,14 +340,12 @@ def stock_taking_page():
             next_id += 1
 
         st.success(f"Successfully added {len(entries)} item(s)!")
-        del st.session_state.stock_input
-        # No rerun here → success message stays visible
+        del st.session_state.stock_input  # clear for next entry
 
-    # Clear & full refresh
     if clear_pressed:
         if "stock_input" in st.session_state:
             del st.session_state.stock_input
-        st.rerun()
+        st.rerun()  # full refresh – now instantly shows empty box
 
 # === CLEAR INPUT ===
 def clear_template_input():
