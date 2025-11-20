@@ -283,18 +283,23 @@ def stock_taking_page():
     st.markdown("**Enter: Product → Cost → Price (newline or tab-separated)**")
     st.code("Nike Air Force\n280\n580\n\nAdidas Ultraboost[TAB]320[TAB]680", language="text")
 
-    # Use persistent key so we can safely modify it
     input_text = st.text_area(
-        "", 
-        height=250, 
-        key="stock_input", 
+        "",
+        height=250,
+        key="stock_input",
         label_visibility="collapsed",
         placeholder="Paste or type here..."
     )
 
+    # Buttons on the same line
     col_btn1, col_btn2 = st.columns([2, 1])
+    with col_btn1:
+        add_pressed = st.button("Add to Stock Sheet", type="primary", use_container_width=True, key="add_stock")
+    with col_btn2:
+        clear_pressed = st.button("Clear & Refresh", type="secondary", use_container_width=True, key="clear_stock")
 
-    if st.button("Add to Stock Sheet", type="primary", use_container_width=True, key="add_stock"):
+    # Add to sheet
+    if add_pressed:
         lines = [l.strip() for l in input_text.splitlines() if l.strip()]
         if not lines:
             st.error("No data entered")
@@ -321,7 +326,7 @@ def stock_taking_page():
             try:
                 cost_val = float(cost) if cost else 0.0
                 price_val = float(price) if price else 0.0
-            except:
+            except ValueError:
                 st.error(f"Invalid number: {product} → Cost: {cost} | Price: {price}")
                 st.stop()
 
@@ -336,11 +341,13 @@ def stock_taking_page():
             next_id += 1
 
         st.success(f"Successfully added {len(entries)} item(s)!")
-        del st.session_state.stock_input   # Safe clear
-        st.rerun()
-
-    if st.button("Clear", use_container_width=True):
         del st.session_state.stock_input
+        # No rerun here → success message stays visible
+
+    # Clear & full refresh
+    if clear_pressed:
+        if "stock_input" in st.session_state:
+            del st.session_state.stock_input
         st.rerun()
 
 # === CLEAR INPUT ===
