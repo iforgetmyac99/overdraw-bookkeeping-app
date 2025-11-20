@@ -452,13 +452,7 @@ def order_details_page():
     with col1:
         st.title("Order Details")
     with col2:
-        st.button("Home", key="home_details", on_click=go_home)
-
-    # Top back button – fixed
-    if st.button("← Pending Orders", type="secondary", use_container_width=True, key="back_top"):
-        get_pending_df.clear()
-        st.session_state.page = "Pending Orders"
-        st.rerun()
+        st.button("Home", key="home_details", on_click=go_home)  # Only Home button remains
 
     if 'selected_order' not in st.session_state:
         st.error("No order selected.")
@@ -489,14 +483,9 @@ def order_details_page():
 
         if update_sf_delivery(st.session_state['selected_order'], sf_input.strip()):
             st.success("SF number saved → Status changed to **Delivered**")
+            get_pending_df.clear()  # auto-refresh the list next time you go back
             msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
             copyable_box(msg, height=110)
-
-            # Bottom back button after success – fixed
-            if st.button("← Back to Pending Orders", type="primary", use_container_width=True, key="back_bottom"):
-                get_pending_df.clear()
-                st.session_state.page = "Pending Orders"
-                st.rerun()
         else:
             st.error("Update failed.")
 
