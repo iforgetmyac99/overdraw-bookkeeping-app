@@ -7,6 +7,7 @@ from datetime import datetime
 import time
 
 # === Copybox Helper Function Start === #
+# === Copybox Helper Function – FIXED with visible clipboard icon ===
 def copyable_box(text: str, height: int = 150, key=None):
     st.text_area(
         "",
@@ -14,7 +15,7 @@ def copyable_box(text: str, height: int = 150, key=None):
         height=height,
         key=key,
         label_visibility="collapsed",
-        help="Click the clipboard icon to copy"
+        help="Click the clipboard icon to copy"   # ← THIS LINE IS REQUIRED
     )
 # === Copybox Helper Function End === #
 
