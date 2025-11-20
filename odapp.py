@@ -268,6 +268,7 @@ def update_order_status(order_num, status):
 # === QUICK RESPONSES PAGE ===
 # === QUICK RESPONSES - FROM GOOGLE SHEET "Response" ===
 # === QUICK RESPONSES - FROM GOOGLE SHEET "Response" - FIXED DUPLICATE HEADERS ===
+# === QUICK RESPONSES - FINAL FIXED (works no matter header order or case) ===
 def quick_responses_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -277,24 +278,51 @@ def quick_responses_page():
 
     try:
         sheet = load_response_sheet()
-        # Fix: Force headers and skip bad rows
-        records = sheet.get_all_records(expected_headers=['Language', 'Enquiry', 'Order', 'Payment', 'Success'])
-        df = pd.DataFrame(records)
-
-        if df.empty:
-            st.error("Response sheet is empty or has no valid data.")
+        # Read raw values (first row = headers)
+        values = sheet.get_all_values()
+        if len(values) < 2:
+            st.error("Response sheet has no data rows.")
             return
 
-        # Clean and deduplicate just in case
-        df = df.drop_duplicates(subset=['Language']).set_index('Language')
+        headers = values[0]           # first row
+        rows    = values[1:]          # all data rows
+
+        # Normalise headers (lower case + strip)
+        header_map = {h.strip().lower(): h.strip() for h in headers}
+
+        required = ['language', 'enquiry', 'order', 'payment', 'success']
+        missing = [col for col in required if col not in header_map]
+        if missing:
+            st.error(f"Missing columns in Response sheet: {missing}")
+            return
+
+        # Build clean DataFrame
+        clean_data = []
+        for row in rows:
+            if len(row) < len(headers):
+                row += [''] * (len(headers) - len(row))   # pad short rows
+            clean_data.append({
+                'Language': next((row[i].strip() for i, h in enumerate(headers) if h.strip().lower() == 'language'), ''),
+                'Enquiry' : next((row[i].strip() for i, h in enumerate(headers) if h.strip().lower() == 'enquiry'), ''),
+                'Order'   : next((row[i].strip() for i, h in enumerate(headers) if h.strip().lower() == 'order'), ''),
+                'Payment' : next((row[i].strip() for i, h in enumerate(headers) if h.strip().lower() == 'payment'), ''),
+                'Success' : next((row[i].strip() for i, h in enumerate(headers) if h.strip().lower() == 'success'), ''),
+            })
+
+        df = pd.DataFrame(clean_data)
+        df = df[df['Language'].str.strip() != '']   # remove empty rows
+
+        if df.empty:
+            st.error("No valid language rows found.")
+            return
 
         lang = st.radio("Language", ["中文", "English"], horizontal=True, key="quick_lang")
 
-        if lang not in df.index:
-            st.error(f"No data found for language: {lang}")
+        row = df[df['Language'] == lang]
+        if row.empty:
+            st.error(f"No response found for {lang}")
             return
-
-        row = df.loc[lang]
+        row = row.iloc[0]
 
         st.markdown("#### Enquiry")
         st.text_area("", value=row['Enquiry'], height=150, key="enq", label_visibility="collapsed")
@@ -306,7 +334,7 @@ def quick_responses_page():
         st.text_area("", value=row['Success'], height=120, key="succ", label_visibility="collapsed")
 
     except Exception as e:
-        st.error("Failed to load Quick Responses. Check your 'Response' sheet headers.")
+        st.error("Failed to load Quick Responses.")
         st.code(str(e))
         
 # === STOCK TAKING PAGE ===
