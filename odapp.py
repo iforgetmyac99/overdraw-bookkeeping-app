@@ -265,7 +265,7 @@ def update_order_status(order_num, status):
     sheet.update_cell(row_idx[0] + 2, col_idx, status)
     return True
 
-# === QUICK RESPONSES - TABS + NATIVE TINY COPY ICON (TOP-RIGHT CORNER) ===
+# === QUICK RESPONSES - TABS + NATIVE TINY COPY ICON (100% CLEAN) ===
 def quick_responses_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -285,28 +285,44 @@ def quick_responses_page():
         en_row  = data[2]
 
         def idx(name):
-            try: return headers.index(name.lower())
-            except: return -1
+            try:
+                return headers.index(name.lower())
+            except:
+                return -1
 
         enq = idx("enquiry")
         ord_ = idx("order")
         pay = idx("payment")
         suc = idx("success")
+
         if -1 in (enq, ord_, pay, suc):
-            st.error("Missing required columns")
+            st.error("Missing required columns (Enquiry/Order/Payment/Success)")
             return
 
- деталей        chinese = {"Enquiry": zh_row[enq].strip(), "Order": zh_row[ord_].strip(),
-                   "Payment": zh_row[pay].strip(), "Success": zh_row[suc].strip()}
-        english = {"Enquiry": en_row[enq].strip(), "Order": en_row[ord_].strip(),
-                   "Payment": en_row[pay].strip(), "Success": en_row[suc].strip()}
+        chinese = {
+            "Enquiry": zh_row[enq].strip(),
+            "Order":   zh_row[ord_].strip(),
+            "Payment": zh_row[pay].strip(),
+            "Success": zh_row[suc].strip()
+        }
+        english = {
+            "Enquiry": en_row[enq].strip(),
+            "Order":   en_row[ord_].strip(),
+            "Payment": en_row[pay].strip(),
+            "Success": en_row[suc].strip()
+        }
 
         tab_zh, tab_en = st.tabs(["中文", "English"])
 
         def copyable_textarea(text, height=150, key=None):
-            st.text_area("", value=text, height=height, key=key,
-                         label_visibility="collapsed",
-                         help="Click the clipboard icon ⟹ copy")
+            st.text_area(
+                "", 
+                value=text, 
+                height=height, 
+                key=key,
+                label_visibility="collapsed",
+                help="Click the clipboard icon to copy"
+            )
 
         with tab_zh:
             st.markdown("#### Enquiry")
