@@ -266,84 +266,30 @@ def update_order_status(order_num, status):
     return True
 
 # === QUICK RESPONSES PAGE ===
+# === QUICK RESPONSES - FROM GOOGLE SHEET "Response" ===
 def quick_responses_page():
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("Quick Responses")
     with col2:
-        st.button("Home", key="home_button_quick", on_click=go_home)
-    st.markdown("""
-    <style>
-    .stTextInput, .stTextArea { width: 100% !important; }
-    .stDataFrame { width: 100%; overflow-x: auto; }
-    .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
-    .stTextArea textarea { user-select: all; }
-    .item-label { margin-bottom: 0px; font-weight: bold; }
-    .item-container { margin-bottom: 20px; }
-    .button-container { display: flex; gap: 5px; justify-content: flex-start; margin-bottom: 20px; }
-    </style>
-    <script>
-    document.querySelectorAll('textarea').forEach(textarea => {
-        textarea.addEventListener('dblclick', function() {
-            this.select();
-        });
-    });
-    </script>
-    """, unsafe_allow_html=True)
-    if 'quick_response_lang' not in st.session_state:
-        st.session_state['quick_response_lang'] = None
-    st.markdown('<div class="button-container">', unsafe_allow_html=True)
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        if st.button("中文", key="quick_chinese_button"):
-            st.session_state['quick_response_lang'] = 'zh'
-            st.rerun()
-    with col2:
-        if st.button("English", key="quick_english_button"):
-            st.session_state['quick_response_lang'] = 'en'
-            st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.button("Home", key="home_quick", on_click=go_home)
 
-    if st.session_state['quick_response_lang'] is None:
-        return
+    sheet = load_response_sheet()
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data)
 
-    lang = st.session_state['quick_response_lang']
-    responses = DEFAULT_RESPONSES[lang]
-    keys = ['express_order', 'payment_method', 'completed_order', 'more_products'] if lang == 'zh' else ['express_order', 'payment_method', 'completed_order']
-    labels = ['快速落單', '付款方法', '落單成功', '更多款式'] if lang == 'zh' else ['Express Order', 'Payment Method', 'Completed Order']
+    lang = st.radio("Language", ["中文", "English"], horizontal=True, key="quick_lang")
 
-    for i, key in enumerate(keys):
-        st.markdown(f"### {labels[i]}")
-        saved_key = f"saved_{lang}_{key}"
-        current_key = f"current_{lang}_{key}"
-        edit_key = f"edit_{lang}_{key}"
-        saved_text = st.session_state.get(saved_key, responses[key])
-        current_text = st.session_state.get(current_key, saved_text)
+    row = df[df['Language'] == lang].iloc[0]
 
-        if st.session_state.get(edit_key, False):
-            edited = st.text_area("", value=current_text, height=150, key=f"edit_input_{lang}_{key}")
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button("Save", key=f"save_{lang}_{key}"):
-                    st.session_state[saved_key] = edited
-                    st.session_state[current_key] = edited
-                    st.session_state[edit_key] = False
-                    st.rerun()
-            with col_b:
-                if st.button("Cancel", key=f"cancel_{lang}_{key}"):
-                    st.session_state[current_key] = saved_text
-                    st.session_state[edit_key] = False
-                    st.rerun()
-        else:
-            st.code(saved_text, language=None)
-            col_a, col_b = st.columns([1, 4])
-            with col_a:
-                if st.button("Edit", key=f"edit_btn_{lang}_{key}"):
-                    st.session_state[edit_key] = True
-                    st.session_state[current_key] = saved_text
-                    st.rerun()
-            with col_b:
-                st.markdown("")
+    st.markdown("#### Enquiry")
+    st.text_area("", value=row['Enquiry'], height=150, key="enq", label_visibility="collapsed")
+    st.markdown("#### Order")
+    st.text_area("", value=row['Order'], height=150, key="ord", label_visibility="collapsed")
+    st.markdown("#### Payment")
+    st.text_area("", value=row['Payment'], height=100, key="pay", label_visibility="collapsed")
+    st.markdown("#### Success")
+    st.text_area("", value=row['Success'], height=120, key="succ", label_visibility="collapsed")
 
 # === STOCK TAKING PAGE ===
 def stock_taking_page():
@@ -516,14 +462,19 @@ def pending_orders_page():
 
 # === ORDER DETAILS PAGE ===
 # === ORDER DETAILS PAGE - FIXED & SIMPLIFIED ===
+# === ORDER DETAILS PAGE - BACK BUTTONS FIXED ===
 def order_details_page():
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("Order Details")
     with col2:
-        st.button("Home", key="home_button_details", on_click=go_home)
+        st.button("Home", key="home_details", on_click=go_home)
 
-    st.button("← Back", on_click=lambda: st.session_state.update(page="Pending Orders"))
+    # ← Back button at top (always visible)
+    if st.button("← Back"):
+        st.session_state.page = "Pending Orders"
+        get_pending_df.clear()
+        st.rerun()
 
     if 'selected_order' not in st.session_state:
         st.error("No order selected.")
@@ -531,81 +482,36 @@ def order_details_page():
 
     sheet = load_journal_sheet()
     all_data = sheet.get_all_values()
-    if len(all_data) < 2:
-        st.error("No data.")
-        return
+    if len(all_data) < 2: return
 
     headers = all_data[0]
-    rows = all_data[1:]
-    df = pd.DataFrame(rows, columns=headers)
+    df = pd.DataFrame(all_data[1:], columns=headers)
     df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
+    row = df[df['Order'] == st.session_state['selected_order']].iloc[0]
 
-    order_row = df[df['Order'] == st.session_state['selected_order']]
-    if order_row.empty:
-        st.error("Order not found.")
-        return
-    order_row = order_row.iloc[0]
-
-    st.markdown("**Order Number**")
-    st.code(order_row.get('Order', ''), language=None)
-    st.markdown("**Item • Color • Size**")
-    st.code(f"{order_row.get('Item','')} (Color: {order_row.get('Color','')}, Size: {order_row.get('Size','')})")
-    st.markdown("**Carousell ID**")
-    st.code(order_row.get('Carousell ID', ''))
-    st.markdown("**Phone**")
-    st.code(order_row.get('Phone', ''))
-    st.markdown("**Address**")
-    st.code(order_row.get('Address', ''))
+    st.markdown("**Order Number**"); st.code(row['Order'])
+    st.markdown("**Item • Color • Size**"); st.code(f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})")
+    st.markdown("**Carousell ID**"); st.code(row.get('Carousell ID', ''))
+    st.markdown("**Phone**"); st.code(row['Phone'])
+    st.markdown("**Address**"); st.code(row['Address'])
 
     sf_input = st.text_input("Enter SF Delivery Number", key="sf_input")
 
-    # ── ONE-CLICK SUBMIT (saves SF + auto changes status to Delivered) ──
     if st.button("Submit SF Number & Mark as Delivered", type="primary"):
-        if not sf_input.strip():
-            st.error("Please enter SF number.")
-        else:
+        if sf_input.strip():
             if update_sf_delivery(st.session_state['selected_order'], sf_input.strip()):
                 st.success("SF number saved → Status changed to **Delivered**")
                 msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
-                st.text_area("Copy message to customer:", value=msg, height=100)
-                if st.button("Back to Pending Orders"):
+                st.text_area("Copy message to customer:", value=msg, height=100, key="msg_box")
+                
+                if st.button("← Back to Pending Orders"):
                     get_pending_df.clear()
                     st.session_state.page = "Pending Orders"
                     st.rerun()
             else:
-                st.error("Failed to update Google Sheet.")
-            
-    if 'success' in st.session_state:
-        st.success("Updated!")
-        if 'message_lang' not in st.session_state:
-            st.session_state['message_lang'] = 'en'
-        st.markdown('<div class="item-container"><p class="item-label">Delivery Message:</p>', unsafe_allow_html=True)
-        msg = f"順豐number: {st.session_state['sf_delivery']}\nHello 鞋已經寄出咗了 收到嘅話麻煩比個五星好評 多謝支持" if st.session_state['message_lang'] == 'zh' else f"SF Delivery Number: {st.session_state['sf_delivery']}\nHello shoes are sent. Please leave a 5 star review. Have a nice day."
-        st.text_area("", value=msg, height=100, disabled=True)
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("English", key="english_button"):
-                st.session_state['message_lang'] = 'en'
-                st.rerun()
-        with col2:
-            if st.button("中文", key="chinese_button"):
-                st.session_state['message_lang'] = 'zh'
-                st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-        if st.button("Finish"):
-            if update_order_status(st.session_state['selected_order'], "Delivered"):
-                ...
-                del st.session_state['success']
-                st.session_state['page'] = 'Pending Orders'
-                st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-                reset_page_state('Pending Orders')
-                st.rerun()
-            else:
-                st.error("Failed to update status.")
-    if st.session_state.get('page') != 'Order Details':
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state(st.session_state['page'])
-        st.rerun()
+                st.error("Update failed.")
+        else:
+            st.error("Enter SF number.")
 
 # === BOOK KEEPING PAGE ===
 def book_keeping_page():
@@ -660,44 +566,52 @@ def book_keeping_page():
             go_home()
 
 # === RECORD CHECKING PAGE ===
+# === RECORD CHECKING - SPLIT INTO ORDER & STOCK ===
 def record_checking_page():
     col1, col2 = st.columns([8, 1])
     with col1:
-        st.title("Transaction Record")
+        st.title("Record Checking")
     with col2:
-        st.button("Home", key="home_button_record", on_click=go_home)
-    st.markdown("""
-    <style>
-    .stTextInput, .stTextArea { width: 100% !important; }
-    .stDataFrame { width: 100%; overflow-x: auto; }
-    .stDataFrame td, .stDataFrame th { white-space: normal !important; word-wrap: break-word !important; }
-    .stTextArea textarea { user-select: all; }
-    </style>
-    <script>
-    document.querySelectorAll('textarea').forEach(textarea => {
-        textarea.addEventListener('dblclick', function() {
-            this.select();
-        });
-    });
-    </script>
-    """, unsafe_allow_html=True)
-    st.header("Record Checking")
-    query = st.text_input("Search", value=st.session_state.get('search_query', ""))
-    if st.button("Search"):
-        if query:
-            st.session_state['search_query'] = query
-            results = search_sheet(query)
-            if not results.empty:
-                st.dataframe(results, use_container_width=True)
-            else:
-                st.warning("No matches.")
-        else:
-            st.error("Enter terms.")
-    if st.session_state.get('page') != 'Record Checking':
-        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-        reset_page_state(st.session_state['page'])
-        st.rerun()
+        st.button("Home", key="home_record", on_click=go_home)
 
+    tab1, tab2 = st.tabs(["Order Record", "Stock Record"])
+
+    with tab1:
+        st.header("Search Order Records (Journal Sheet)")
+        query = st.text_input("Search Order (Carousell ID, Phone, Item, etc.)", key="order_search")
+        if st.button("Search Orders"):
+            if query:
+                results = search_sheet(query)
+                if not results.empty:
+                    st.dataframe(results, use_container_width=True)
+                else:
+                    st.info("No matching orders found.")
+            else:
+                st.warning("Enter search term.")
+
+    with tab2:
+        st.header("Search Stock Records (Stock Sheet)")
+        stock_query = st.text_input("Search Stock (Product Name)", key="stock_search")
+        if st.button("Search Stock"):
+            if stock_query:
+                stock_sheet = load_stock_sheet()
+                data = stock_sheet.get_all_records()
+                df = pd.DataFrame(data)
+                results = df[df.apply(lambda row: stock_query.lower() in ' '.join(str(v).lower() for v in row.values), axis=1)]
+                if not results.empty:
+                    st.dataframe(results, use_container_width=True)
+                else:
+                    st.info("No matching stock found.")
+            else:
+                st.warning("Enter product name.")
+
+@st.cache_resource
+def load_response_sheet():
+    scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+    client = gspread.authorize(creds)
+    return client.open_by_key('10CLEJyH7LGkZrVjc8EiicJ2PCBY_se7gALChd_YyaCg').worksheet("Response")
+    
 # === MAIN ROUTER ===
 query_params = st.query_params.to_dict()
 if 'logged_in' in query_params and query_params['logged_in'] == 'true' and 'page' in query_params and st.session_state.get('logged_in'):
