@@ -455,7 +455,7 @@ def order_details_page():
     with col1:
         st.title("Order Details")
     with col2:
-        st.button("Home", key="home_details", on_click=go_home)  # Only Home button remains
+        st.button("Home", key="home_details", on_click=go_home)
 
     if 'selected_order' not in st.session_state:
         st.error("No order selected.")
@@ -471,11 +471,23 @@ def order_details_page():
     df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
     row = df[df['Order'] == st.session_state['selected_order']].iloc[0]
 
-    st.markdown("**Order Number**"); st.code(row['Order'])
-    st.markdown("**Item • Color • Size**"); st.code(f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})")
-    st.markdown("**Carousell ID**"); st.code(row.get('Carousell ID', ''))
-    st.markdown("**Phone**"); st.code(row['Phone'])
-    st.markdown("**Address**"); st.code(row['Address'])
+    # Helper for consistent copyable boxes
+    def show_copyable(label: str, value: str):
+        st.markdown(f"**{label}**")
+        st.text_area(
+            "",
+            value=value,
+            height=90,
+            key=f"detail_{label.replace(' ', '_').lower()}",
+            label_visibility="collapsed",
+            help="Click the clipboard icon to copy"
+        )
+
+    show_copyable("Order Number", row['Order'])
+    show_copyable("Item • Color • Size", f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})")
+    show_copyable("Carousell ID", row.get('Carousell ID', ''))
+    show_copyable("Phone", row['Phone'])
+    show_copyable("Address", row['Address'])
 
     sf_input = st.text_input("Enter SF Delivery Number", key="sf_input")
 
@@ -486,9 +498,17 @@ def order_details_page():
 
         if update_sf_delivery(st.session_state['selected_order'], sf_input.strip()):
             st.success("SF number saved → Status changed to **Delivered**")
-            get_pending_df.clear()  # auto-refresh the list next time you go back
+            get_pending_df.clear()
             msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
-            copyable_box(msg, height=110)
+            st.markdown("**Message to customer**")
+            st.text_area(
+                "",
+                value=msg,
+                height=110,
+                key="sf_message_final",
+                label_visibility="collapsed",
+                help="Click the clipboard icon to copy"
+            )
         else:
             st.error("Update failed.")
 
