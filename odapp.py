@@ -349,69 +349,95 @@ def quick_responses_page():
         st.error("Failed to load Quick Responses")
         st.code(str(e))
         
-# === STOCK TAKING PAGE ===
+# === STOCK TAKING - SUPPORTS COST + PRICE (NEW COLUMN) ===
 def stock_taking_page():
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("Stock Taking")
     with col2:
         st.button("Home", key="home_stock", on_click=go_home)
-    st.markdown("""
-    <style>
-    .stTextArea textarea { font-family: monospace; }
-    </style>
-    """, unsafe_allow_html=True)
-    st.markdown("**Enter: Product Name → Cost (newline or tab)**", help="Example:\nAdidas Terrex\n240\nOR\nAdidas Terrex[TAB]240")
-    input_text = st.text_area("", height=200, key="stock_input")
-    if st.button("Add to Stock Sheet", key="add_stock_btn"):
+
+    st.markdown("**Enter: Product Name → Cost → Price (newline or tab)**")
+    st.write("Example:")
+    st.code("""Adidas UltraBoost
+280
+580
+
+Nike Air Max[TAB]320[TAB]680""")
+
+    input_text = st.text_area("", height=250, key="stock_input")
+
+    if st.button("Add to Stock Sheet", type="primary"):
         lines = [line.strip() for line in input_text.splitlines() if line.strip()]
+        if not lines:
+            st.error("No data entered.")
+            return
+
         entries = []
         i = 0
         while i < len(lines):
             line = lines[i]
+
+            # Case 2: Tab-separated line (Product[TAB]Cost[TAB]Price)
             if '\t' in line:
-                product, cost_str = line.split('\t', 1)
-                product = product.strip()
-                cost_str = cost_str.strip()
+                parts = line.split('\t')
+                if len(parts) >= 3:
+                    product = parts[0].strip()
+                    cost = parts[1].strip()
+                    price = parts[2].strip()
+                elif len(parts) == 2:
+                    product = parts[0].strip()
+                    cost = parts[1].strip()
+                    price = ""
+                else:
+                    st.error(f"Invalid tab format: {line}")
+                    return
+                i += 1
             else:
+                # Case 1: Multi-line format (Name → Cost → Price)
                 product = line
                 i += 1
                 if i >= len(lines):
-                    st.error(f"Missing cost for: {product}")
+                    st.error(f"Missing Cost for: {product}")
                     return
-                cost_str = lines[i].strip()
+                cost = lines[i].strip()
+                i += 1
+                price = lines[i].strip() if i < len(lines) else ""
+                i += 1
+
+            # Validate numbers
             try:
-                cost = float(cost_str)
+                cost_val = float(cost) if cost else 0
             except:
-                st.error(f"Invalid cost '{cost_str}' for: {product}")
+                st.error(f"Invalid Cost '{cost}' for: {product}")
                 return
-            entries.append((product, cost))
-            i += 1
-        if not entries:
-            st.error("No valid entries.")
-            return
+            try:
+                price_val = float(price) if price else 0
+            except:
+                st.error(f"Invalid Price '{price}' for: {product}")
+                return
+
+            entries.append((product, cost_val, price_val))
+
+        # Add to sheet
         sheet = load_stock_sheet()
         data = sheet.get_all_records()
         df = pd.DataFrame(data)
-        next_id = 1
-        if not df.empty and 'ID' in df.columns:
-            ids = pd.to_numeric(df['ID'], errors='coerce').dropna()
-            next_id = int(ids.max()) + 1 if not ids.empty else 1
+        next_id = int(df['ID'].max()) + 1 if not df.empty and 'ID' in df else 1
+
         success = 0
-        errors = []
         with st.spinner(f"Adding {len(entries)} items..."):
-            for product, cost in entries:
+            for product, cost, price in entries:
                 try:
-                    sheet.append_row([next_id, product, cost])
-                    success += 1
+                    sheet.append_row([next_id, product, cost, price])
                     next_id += 1
+                    success += 1
                 except Exception as e:
-                    errors.append(f"{product}: {str(e)}")
+                    st.error(f"Failed on {product}: {e}")
+
         if success:
-            st.success(f"Added {success} to **Stock** sheet!")
-        if errors:
-            st.error(f"{len(errors)} error(s):")
-            for e in errors: st.code(e)
+            st.success(f"Successfully added {success} item(s) to Stock sheet!")
+            st.balloons()
 
 # === CLEAR INPUT ===
 def clear_template_input():
