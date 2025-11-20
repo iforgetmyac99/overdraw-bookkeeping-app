@@ -329,68 +329,87 @@ def quick_responses_page():
         st.code(str(e))
         
 # === STOCK TAKING PAGE ===
+# === STOCK TAKING PAGE - SUPPORTS COST + PRICE ===
 def stock_taking_page():
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("Stock Taking")
     with col2:
         st.button("Home", key="home_stock", on_click=go_home)
-    st.markdown("""
-    <style>
-    .stTextArea textarea { font-family: monospace; }
-    </style>
-    """, unsafe_allow_html=True)
-    st.markdown("**Enter: Product Name → Cost (newline or tab)**", help="Example:\nAdidas Terrex\n240\nOR\nAdidas Terrex[TAB]240")
-    input_text = st.text_area("", height=200, key="stock_input")
-    if st.button("Add to Stock Sheet", key="add_stock_btn"):
-        lines = [line.strip() for line in input_text.splitlines() if line.strip()]
-        entries = []
-        i = 0
-        while i < len(lines):
-            line = lines[i]
-            if '\t' in line:
-                product, cost_str = line.split('\t', 1)
-                product = product.strip()
-                cost_str = cost_str.strip()
-            else:
-                product = line
-                i += 1
-                if i >= len(lines):
-                    st.error(f"Missing cost for: {product}")
-                    return
-                cost_str = lines[i].strip()
-            try:
-                cost = float(cost_str)
-            except:
-                st.error(f"Invalid cost '{cost_str}' for: {product}")
-                return
-            entries.append((product, cost))
-            i += 1
-        if not entries:
-            st.error("No valid entries.")
-            return
-        sheet = load_stock_sheet()
-        data = sheet.get_all_records()
-        df = pd.DataFrame(data)
-        next_id = 1
-        if not df.empty and 'ID' in df.columns:
-            ids = pd.to_numeric(df['ID'], errors='coerce').dropna()
-            next_id = int(ids.max()) + 1 if not ids.empty else 1
-        success = 0
-        errors = []
-        with st.spinner(f"Adding {len(entries)} items..."):
-            for product, cost in entries:
+
+    st.markdown("**Enter: Product → Cost → Price (newline or tab-separated)**")
+    st.code("Nike Air Force\n280\n580\n\nAdidas Ultraboost[TAB]320[TAB]680")
+
+    input_text = st.text_area("", height=250, key="stock_input", label_visibility="collapsed")
+
+    col_btn1, col_btn2 = st.columns([2, 1])
+    added = False
+
+    with col_btn1:
+        if st.button("Add to Stock Sheet", type="primary", use_container_width=True):
+            lines = [l.strip() for l in input_text.splitlines() if l.strip()]
+            if not lines:
+                st.error("No data entered")
+                st.stop()
+
+            entries = []
+            i = 0
+            while i < len(lines):
+                line = lines[i]
+
+                # Tab-separated: Product\tCost\tPrice
+                if '\t' in line:
+                    parts = line.split('\t')
+                    product = parts[0].strip()
+                    cost = parts[1].strip() if len(parts) > 1 else ""
+                    price = parts[2].strip() if len(parts) > 2 else ""
+                    i += 1
+                # Newline format: Product\nCost\nPrice
+                else:
+                    product = line
+                    i += 1
+                    if i >= len(lines):
+                        st.error(f"Missing Cost for: {product}")
+                        st.stop()
+                    cost = lines[i].strip()
+                    i += 1
+                    if i >= len(lines):
+                        st.error(f"Missing Price for: {product}")
+                        st.stop()
+                    price = lines[i].strip()
+                    i += 1
+
                 try:
-                    sheet.append_row([next_id, product, cost])
-                    success += 1
-                    next_id += 1
-                except Exception as e:
-                    errors.append(f"{product}: {str(e)}")
-        if success:
-            st.success(f"Added {success} to **Stock** sheet!")
-        if errors:
-            st.error(f"{len(errors)} error(s):")
-            for e in errors: st.code(e)
+                    cost_val = float(cost) if cost else 0.0
+                    price_val = float(price) if price else 0.0
+                except ValueError:
+                    st.error(f"Invalid number in: {product} | Cost: {cost} | Price: {price}")
+                    st.stop()
+
+                entries.append((product, cost_val, price_val))
+
+            # Add to sheet
+            sheet = load_stock_sheet()
+            data = sheet.get_all_records()
+            df = pd.DataFrame(data)
+            next_id = 1
+            if not df.empty and 'ID' in df.columns:
+                max_id = pd.to_numeric(df['ID'], errors='coerce').max()
+                next_id = int(max_id) + 1 if pd.notna(max_id) else 1
+
+            success = 0
+            for product, cost, price in entries:
+                sheet.append_row([next_id, product, cost, price])
+                next_id += 1
+                success += 1
+
+            st.success(f"Added {success} item(s) to Stock sheet!")
+            added = True
+
+    with col_btn2:
+        if st.button("Clear Input", use_container_width=True) or added:
+            st.session_state.stock_input = ""
+            st.rerun()
 
 # === CLEAR INPUT ===
 def clear_template_input():
