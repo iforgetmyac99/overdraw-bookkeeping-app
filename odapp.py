@@ -482,7 +482,7 @@ def order_details_page():
             if update_sf_delivery(st.session_state['selected_order'], sf_input.strip()):
                 st.success("SF number saved → Status changed to **Delivered**")
                 msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
-                st.text_area("Copy message to customer:", value=msg, height=100, key="msg_box")
+                copyable_box(msg, height=110)
                 
                 if st.button("← Back to Pending Orders"):
                     get_pending_df.clear()
