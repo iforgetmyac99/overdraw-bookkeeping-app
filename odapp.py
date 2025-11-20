@@ -477,14 +477,13 @@ def pending_orders_page():
     st.write(f"Found {len(pending_df)} pending order(s):")
     st.dataframe(pending_df[['Order', 'Item', 'Color', 'Size']], use_container_width=True)
 
-    # Back to clickable buttons (no copyable text boxes)
     for _, row in pending_df.iterrows():
         label = f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})"
         if st.button(label, key=f"order_{row['Order']}", use_container_width=True):
             st.session_state['selected_order'] = row['Order']
             st.session_state.page = 'Order Details'
-            reset_page_state('Order Details')
-            st.rerun()
+            reset_page_state('Order Details')   # clears old sf_input etc.
+            st.rerun()                        
 
 # === ORDER DETAILS PAGE ===
 def order_details_page():
