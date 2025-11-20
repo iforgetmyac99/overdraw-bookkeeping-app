@@ -213,9 +213,9 @@ def update_order_status(order_num, status):
     sheet.update_cell(row_idx[0] + 2, col_idx, status)
     return True
 
-# === QUICK RESPONSES - TABS + NATIVE TINY COPY ICON (100% CLEAN) ===
-# === QUICK RESPONSES - NATIVE COPY BUTTON (TINY CLIPBOARD ICON) ===
-# === QUICK RESPONSES - UNIFIED COPYABLE TEXTBOX ===
+
+# === QUICK RESPONSES === #
+# === QUICK RESPONSES - EXACT STYLE AS YOUR PHOTO ===
 def quick_responses_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -223,44 +223,53 @@ def quick_responses_page():
     with col2:
         st.button("Home", key="home_quick", on_click=go_home)
 
+    def copy_box(text, height=120):
+        st.text_area(
+            "", 
+            value=text.strip(), 
+            height=height,
+            key=f"copy_{hash(text)}",
+            label_visibility="collapsed",
+            help="Click the copy icon to copy"
+        )
+
     try:
         sheet = load_response_sheet()
         data = sheet.get("B2:F4")
         if len(data) < 3:
-            st.error("Response sheet missing data (need B2:F4)")
+            st.error("Response sheet missing data")
             return
 
         headers = [h.strip().lower() for h in data[0]]
         zh_row, en_row = data[1], data[2]
 
-        def idx(name):
+        def get_col(name):
             try: return headers.index(name.lower())
             except: return -1
 
-        cols = ["enquiry", "order", "payment", "success"]
-        if any(idx(c) == -1 for c in cols):
-            st.error("Missing required columns")
+        e, o, p, s = get_col("enquiry"), get_col("order"), get_col("payment"), get_col("success")
+        if -1 in (e, o, p, s):
+            st.error("Missing columns in Response sheet")
             return
 
-        zh = {c.title(): zh_row[idx(c)].strip() for c in cols}
-        en = {c.title(): en_row[idx(c)].strip() for c in cols}
+        zh = [zh_row[e], zh_row[o], zh_row[p], zh_row[s]]
+        en = [en_row[e], en_row[o], en_row[p], en_row[s]]
+        titles = ["Enquiry", "Order", "Payment", "Success"]
 
         tab_zh, tab_en = st.tabs(["中文", "English"])
 
         with tab_zh:
-            st.markdown("#### Enquiry");  copyable_box(zh["Enquiry"], 180, "zh_enq")
-            st.markdown("#### Order");    copyable_box(zh["Order"], 220, "zh_ord")
-            st.markdown("#### Payment");  copyable_box(zh["Payment"], 130, "zh_pay")
-            st.markdown("#### Success");  copyable_box(zh["Success"], 160, "zh_suc")
+            for title, text in zip(titles, zh):
+                st.markdown(f"**{title}**")
+                copy_box(text, height=160 if "Enquiry" in title else 180 if "Order" in title else 130)
 
         with tab_en:
-            st.markdown("#### Enquiry");  copyable_box(en["Enquiry"], 180, "en_enq")
-            st.markdown("#### Order");    copyable_box(en["Order"], 220, "en_ord")
-            st.markdown("#### Payment");  copyable_box(en["Payment"], 130, "en_pay")
-            st.markdown("#### Success");  copyable_box(en["Success"], 160, "en_suc")
+            for title, text in zip(titles, en):
+                st.markdown(f"**{title}**")
+                copy_box(text, height=160 if "Enquiry" in title else 180 if "Order" in title else 130)
 
     except Exception as e:
-        st.error("Failed to load Quick Responses")
+        st.error("Failed to load responses")
         st.code(str(e))
         
 # === STOCK TAKING PAGE ===
@@ -272,78 +281,68 @@ def stock_taking_page():
         st.button("Home", key="home_stock", on_click=go_home)
 
     st.markdown("**Enter: Product → Cost → Price (newline or tab-separated)**")
-    st.code("Nike Air Force\n280\n580\n\nAdidas Ultraboost[TAB]320[TAB]680")
+    st.code("Nike Air Force\n280\n580\n\nAdidas Ultraboost[TAB]320[TAB]680", language="text")
 
-    input_text = st.text_area("", height=250, key="stock_input", label_visibility="collapsed")
+    # Use persistent key so we can safely modify it
+    input_text = st.text_area(
+        "", 
+        height=250, 
+        key="stock_input", 
+        label_visibility="collapsed",
+        placeholder="Paste or type here..."
+    )
 
     col_btn1, col_btn2 = st.columns([2, 1])
-    added = False
 
-    with col_btn1:
-        if st.button("Add to Stock Sheet", type="primary", use_container_width=True):
-            lines = [l.strip() for l in input_text.splitlines() if l.strip()]
-            if not lines:
-                st.error("No data entered")
+    if st.button("Add to Stock Sheet", type="primary", use_container_width=True, key="add_stock"):
+        lines = [l.strip() for l in input_text.splitlines() if l.strip()]
+        if not lines:
+            st.error("No data entered")
+            st.stop()
+
+        entries = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if '\t' in line:
+                parts = [p.strip() for p in line.split('\t')]
+                product = parts[0]
+                cost = parts[1] if len(parts) > 1 else ""
+                price = parts[2] if len(parts) > 2 else ""
+                i += 1
+            else:
+                product = line
+                i += 1
+                cost = lines[i].strip() if i < len(lines) else ""
+                i += 1
+                price = lines[i].strip() if i < len(lines) else ""
+                i += 1
+
+            try:
+                cost_val = float(cost) if cost else 0.0
+                price_val = float(price) if price else 0.0
+            except:
+                st.error(f"Invalid number: {product} → Cost: {cost} | Price: {price}")
                 st.stop()
 
-            entries = []
-            i = 0
-            while i < len(lines):
-                line = lines[i]
+            entries.append((product, cost_val, price_val))
 
-                # Tab-separated: Product\tCost\tPrice
-                if '\t' in line:
-                    parts = line.split('\t')
-                    product = parts[0].strip()
-                    cost = parts[1].strip() if len(parts) > 1 else ""
-                    price = parts[2].strip() if len(parts) > 2 else ""
-                    i += 1
-                # Newline format: Product\nCost\nPrice
-                else:
-                    product = line
-                    i += 1
-                    if i >= len(lines):
-                        st.error(f"Missing Cost for: {product}")
-                        st.stop()
-                    cost = lines[i].strip()
-                    i += 1
-                    if i >= len(lines):
-                        st.error(f"Missing Price for: {product}")
-                        st.stop()
-                    price = lines[i].strip()
-                    i += 1
+        sheet = load_stock_sheet()
+        df = pd.DataFrame(sheet.get_all_records() or [])
+        next_id = int(df['ID'].max()) + 1 if not df.empty and 'ID' in df.columns else 1
 
-                try:
-                    cost_val = float(cost) if cost else 0.0
-                    price_val = float(price) if price else 0.0
-                except ValueError:
-                    st.error(f"Invalid number in: {product} | Cost: {cost} | Price: {price}")
-                    st.stop()
+        for product, cost, price in entries:
+            sheet.append_row([next_id, product, cost, price])
+            next_id += 1
 
-                entries.append((product, cost_val, price_val))
+        st.success(f"Successfully added {len(entries)} item(s)!")
+        # Auto-clear input after success
+        st.session_state.stock_input = ""
+        st.rerun()
 
-            # Add to sheet
-            sheet = load_stock_sheet()
-            data = sheet.get_all_records()
-            df = pd.DataFrame(data)
-            next_id = 1
-            if not df.empty and 'ID' in df.columns:
-                max_id = pd.to_numeric(df['ID'], errors='coerce').max()
-                next_id = int(max_id) + 1 if pd.notna(max_id) else 1
-
-            success = 0
-            for product, cost, price in entries:
-                sheet.append_row([next_id, product, cost, price])
-                next_id += 1
-                success += 1
-
-            st.success(f"Added {success} item(s) to Stock sheet!")
-            added = True
-
-    with col_btn2:
-        if st.button("Clear", use_container_width=True) or added:
-            st.session_state["stock_input"] = ""
-            st.rerun()
+    if st.button("Clear", use_container_width=True):
+        st.session_state.stock_input = ""
+        st.rerun()
 
 # === CLEAR INPUT ===
 def clear_template_input():
