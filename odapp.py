@@ -269,6 +269,7 @@ def update_order_status(order_num, status):
 # === QUICK RESPONSES - FROM GOOGLE SHEET "Response" ===
 # === QUICK RESPONSES - FROM GOOGLE SHEET "Response" - FIXED DUPLICATE HEADERS ===
 # === QUICK RESPONSES - FINAL FIXED (works no matter header order or case) ===
+# === QUICK RESPONSES - READS B2:F4 (YOUR EXACT LAYOUT) ===
 def quick_responses_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -278,63 +279,70 @@ def quick_responses_page():
 
     try:
         sheet = load_response_sheet()
-        # Read raw values (first row = headers)
-        values = sheet.get_all_values()
-        if len(values) < 2:
-            st.error("Response sheet has no data rows.")
+        # Read B2:F4 exactly (6 columns: Language, Enquiry, Order, Payment, Success + extra column)
+        data = sheet.get("B2:F4")
+
+        if len(data) < 3 or len(data[0]) < 5:
+            st.error("Response sheet data is incomplete (expected B2:F4).")
             return
 
-        headers = values[0]           # first row
-        rows    = values[1:]          # all data rows
+        headers = [h.strip().lower() for h in data[0]]   # B2:F2
+        zh_row  = data[1]                                # B3:F3 → 中文
+        en_row  = data[2]                                # B4:F4 → English
 
-        # Normalise headers (lower case + strip)
-        header_map = {h.strip().lower(): h.strip() for h in headers}
+        # Find column indices safely
+        def col_idx(name):
+            try:
+                return headers.index(name.lower())
+            except ValueError:
+                return -1
 
-        required = ['language', 'enquiry', 'order', 'payment', 'success']
-        missing = [col for col in required if col not in header_map]
+        language_idx = col_idx("language")
+        enquiry_idx  = col_idx("enquiry")
+        order_idx    = col_idx("order")
+        payment_idx  = col_idx("payment")
+        success_idx  = col_idx("success")
+
+        missing = []
+        if language_idx == -1: missing.append("Language")
+        if enquiry_idx  == -1: missing.append("Enquiry")
+        if order_idx    == -1: missing.append("Order")
+        if payment_idx  == -1: missing.append("Payment")
+        if success_idx  == -1: missing.append("Success")
         if missing:
-            st.error(f"Missing columns in Response sheet: {missing}")
+            st.error(f"Missing columns in B2:F2: {', '.join(missing)}")
             return
 
-        # Build clean DataFrame
-        clean_data = []
-        for row in rows:
-            if len(row) < len(headers):
-                row += [''] * (len(headers) - len(row))   # pad short rows
-            clean_data.append({
-                'Language': next((row[i].strip() for i, h in enumerate(headers) if h.strip().lower() == 'language'), ''),
-                'Enquiry' : next((row[i].strip() for i, h in enumerate(headers) if h.strip().lower() == 'enquiry'), ''),
-                'Order'   : next((row[i].strip() for i, h in enumerate(headers) if h.strip().lower() == 'order'), ''),
-                'Payment' : next((row[i].strip() for i, h in enumerate(headers) if h.strip().lower() == 'payment'), ''),
-                'Success' : next((row[i].strip() for i, h in enumerate(headers) if h.strip().lower() == 'success'), ''),
-            })
-
-        df = pd.DataFrame(clean_data)
-        df = df[df['Language'].str.strip() != '']   # remove empty rows
-
-        if df.empty:
-            st.error("No valid language rows found.")
-            return
+        # Extract values (ignore the 6th column F)
+        responses = {
+            "中文": {
+                "Enquiry": zh_row[enquiry_idx].strip(),
+                "Order":   zh_row[order_idx].strip(),
+                "Payment": zh_row[payment_idx].strip(),
+                "Success": zh_row[success_idx].strip(),
+            },
+            "English": {
+                "Enquiry": en_row[enquiry_idx].strip(),
+                "Order":   en_row[order_idx].strip(),
+                "Payment": en_row[payment_idx].strip(),
+                "Success": en_row[success_idx].strip(),
+            }
+        }
 
         lang = st.radio("Language", ["中文", "English"], horizontal=True, key="quick_lang")
-
-        row = df[df['Language'] == lang]
-        if row.empty:
-            st.error(f"No response found for {lang}")
-            return
-        row = row.iloc[0]
+        r = responses[lang]
 
         st.markdown("#### Enquiry")
-        st.text_area("", value=row['Enquiry'], height=150, key="enq", label_visibility="collapsed")
+        st.text_area("", value=r["Enquiry"], height=180, key="enq", label_visibility="collapsed")
         st.markdown("#### Order")
-        st.text_area("", value=row['Order'], height=150, key="ord", label_visibility="collapsed")
+        st.text_area("", value=r["Order"], height=200, key="ord", label_visibility="collapsed")
         st.markdown("#### Payment")
-        st.text_area("", value=row['Payment'], height=100, key="pay", label_visibility="collapsed")
+        st.text_area("", value=r["Payment"], height=120, key="pay", label_visibility="collapsed")
         st.markdown("#### Success")
-        st.text_area("", value=row['Success'], height=120, key="succ", label_visibility="collapsed")
+        st.text_area("", value=r["Success"], height=150, key="succ", label_visibility="collapsed")
 
     except Exception as e:
-        st.error("Failed to load Quick Responses.")
+        st.error("Failed to load Quick Responses from B2:F4.")
         st.code(str(e))
         
 # === STOCK TAKING PAGE ===
