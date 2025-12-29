@@ -131,8 +131,10 @@ def extract_data(template_text):
             name = line.split(':', 1)[-1].split('：', 1)[-1].strip()
 
         elif any(k in low for k in ['phone', '電話', 'tel']):
-            m = re.search(r'\d{8,}', line)
-            phone = m.group(0) if m else ""
+        # Remove spaces/dashes and match 8+ digits
+            clean_line = re.sub(r'[ -]', '', line)
+            m = re.search(r'\d{8,}', clean_line)
+            phone = m.group(0) if m else ""       
 
         elif any(k in low for k in ['address', '地址']):
             addr = line.split(':', 1)[-1].split('：', 1)[-1].strip()
