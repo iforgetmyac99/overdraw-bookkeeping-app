@@ -446,8 +446,11 @@ def pending_orders_page():
             
             label = f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})"
             if st.button(label, key=unique_key):
-                st.session_state['selected_order'] = row['Order']
-                st.session_state['go_to_details'] = True  # ✅ Safe flag
+                # Save BOTH the exact dataframe index and the order string
+                st.session_state['selected_order_idx'] = idx  
+                st.session_state['selected_order'] = row['Order'] 
+                st.session_state['go_to_details'] = True 
+
         
     else:
         st.warning("No pending orders found. Ensure 'Status' is exactly 'Pending' (case-insensitive).")
@@ -472,11 +475,10 @@ def order_details_page():
     with col1:
         st.title("Order Details")
     with col2:
-        # Change 1: Set a flag instead of using a callback
         if st.button("Home", key="home_details"):
             st.session_state['go_home'] = True
 
-    if 'selected_order' not in st.session_state:
+    if 'selected_order_idx' not in st.session_state or 'selected_order' not in st.session_state:
         st.error("No order selected.")
         return
 
@@ -489,16 +491,18 @@ def order_details_page():
     df = pd.DataFrame(all_data[1:], columns=headers)
     df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
     
-    # Check if order exists to prevent errors
-    matching_orders = df[df['Order'] == st.session_state['selected_order']]
-    if matching_orders.empty:
-        st.error("Order not found.")
+    # Use the exact index to get the right shoe, even if multiple shoes share the same Order ID
+    target_idx = st.session_state['selected_order_idx']
+    
+    try:
+        row = df.loc[target_idx]
+    except KeyError:
+        st.error("Order details not found. The record might have been deleted.")
         return
         
-    row = matching_orders.iloc[0]
     order_id = st.session_state['selected_order']
-
-    # Helper for consistent copyable boxes with GUARANTEED UNIQUE KEYS
+    
+    # We add target_idx to the keys to guarantee absolute uniqueness per specific shoe
     def show_copyable(label: str, value: str):
         st.markdown(f"**{label}**")
         safe_label = label.replace(' ', '_').replace('•', '').strip().lower()
@@ -506,7 +510,7 @@ def order_details_page():
             "",
             value=value,
             height=90,
-            key=f"detail_{order_id}_{safe_label}",  
+            key=f"detail_{order_id}_{target_idx}_{safe_label}",  
             label_visibility="collapsed",
             help="Click the clipboard icon to copy"
         )
@@ -517,39 +521,45 @@ def order_details_page():
     show_copyable("Phone", row['Phone'])
     show_copyable("Address", row['Address'])
 
-    sf_input = st.text_input("Enter SF Delivery Number", key=f"sf_input_{order_id}")
+    sf_input = st.text_input("Enter SF Delivery Number", key=f"sf_input_{order_id}_{target_idx}")
 
     # === SUBMIT SF NUMBER SECTION ===
-    if st.button("Submit SF Number & Mark as Delivered", type="primary", use_container_width=True, key=f"btn_sf_{order_id}"):
+    if st.button("Submit SF Number & Mark as Delivered", type="primary", use_container_width=True, key=f"btn_sf_{order_id}_{target_idx}"):
         if not sf_input.strip():
             st.error("Enter SF number.")
             st.stop()
 
-        if update_sf_delivery(order_id, sf_input.strip()):
-            # Clear cache so it disappears from the Pending list
-            get_pending_df.clear()
+        # Update by exact row index (target_idx + 2 because header is row 1 and 0-index offset)
+        row_num_in_sheet = target_idx + 2 
+        
+        try:
+            sf_col = headers.index('SF Delivery Number') + 1
+            status_col = headers.index('Status') + 1
             
-            # Use flag for safe navigation
+            sheet.update_cell(row_num_in_sheet, sf_col, sf_input.strip())
+            sheet.update_cell(row_num_in_sheet, status_col, "Delivered")
+            
+            get_pending_df.clear()
             st.session_state['go_to_pending'] = True
-        else:
-            st.error("Update failed.")
+        except Exception as e:
+            st.error(f"Update failed: {e}")
 
     # === CANCEL ORDER SECTION ===
     st.divider()  
-    st.markdown("### Cancel Order")
+    st.markdown("### Cancel Item")
     
-    if st.button("❌ Cancel this Order", use_container_width=True, key=f"btn_cancel_{order_id}"):
-        if update_order_status(order_id, "Cancelled"):
-            # Clear cache so it disappears from the Pending list
-            get_pending_df.clear() 
+    if st.button("❌ Cancel this Item", use_container_width=True, key=f"btn_cancel_{order_id}_{target_idx}"):
+        row_num_in_sheet = target_idx + 2 
+        try:
+            status_col = headers.index('Status') + 1
+            sheet.update_cell(row_num_in_sheet, status_col, "Cancelled")
             
-            # Use flag for safe navigation
+            get_pending_df.clear() 
             st.session_state['go_to_pending'] = True
-        else:
-            st.error("Failed to cancel the order. Please check the connection and try again.")
+        except Exception as e:
+            st.error(f"Failed to cancel the item: {e}")
 
     # === NAVIGATION ROUTER ===
-    # Change 2: Handle all page redirects safely at the end of the script
     if st.session_state.get('go_home', False):
         del st.session_state['go_home']
         st.session_state['page'] = 'Home'
@@ -563,6 +573,7 @@ def order_details_page():
         st.query_params.update({"logged_in": "true", "page": "Pending Orders"})
         reset_page_state('Pending Orders')
         st.rerun()
+
 
 # === BOOK KEEPING PAGE ===
 def book_keeping_page():
