@@ -434,16 +434,22 @@ def pending_orders_page():
     </script>
     """, unsafe_allow_html=True)
     if not pending_df.empty:
-        st.write(f"Found {len(pending_df)} pending order(s):")
-        st.dataframe(pending_df[['Order', 'Item', 'Color', 'Size']], use_container_width=True)
-        for _, row in pending_df.iterrows():
-            label = f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})"
-            if st.button(label, key=f"order_{row['Order']}"):
-                st.session_state['selected_order'] = row['Order']
-                st.session_state['page'] = 'Order Details'
-                st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-                reset_page_state('Order Details')
-                st.rerun()
+    st.write(f"Found {len(pending_df)} pending order(s):")
+    st.dataframe(pending_df[['Order', 'Item', 'Color', 'Size']], use_container_width=True)
+    
+    for idx, row in pending_df.iterrows():
+        # Unique key: index + order hash (safe across reruns)
+        safe_order = str(row['Order']).replace(' ', '_')[:10]  # Truncate if too long
+        unique_key = f"order_btn_{idx}_{hash(safe_order) % 10000}"
+        
+        label = f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})"
+        if st.button(label, key=unique_key):
+            st.session_state['selected_order'] = row['Order']
+            st.session_state['page'] = 'Order Details'
+            st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+            reset_page_state('Order Details')
+            st.rerun()
+
     else:
         st.warning("No pending orders found. Ensure 'Status' is exactly 'Pending' (case-insensitive).")
     if st.session_state.get('page') != 'Pending Orders':
