@@ -437,20 +437,34 @@ def pending_orders_page():
     """, unsafe_allow_html=True)
     
     if not pending_df.empty:
-        st.write(f"Found {len(pending_df)} pending order(s):")  # ✅ INDENTED
-        st.dataframe(pending_df[['Order', 'Item', 'Color', 'Size']], use_container_width=True)  # ✅ INDENTED
+        st.write(f"Found {len(pending_df)} pending order(s):")
+        st.dataframe(pending_df[['Order', 'Item', 'Color', 'Size']], use_container_width=True)
         
-        for idx, row in pending_df.iterrows():  # ✅ INDENTED UNDER IF
+        for idx, row in pending_df.iterrows():
             safe_order = str(row['Order']).replace(' ', '_')[:10]
             unique_key = f"order_btn_{idx}_{hash(safe_order) % 10000}"
             
             label = f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})"
             if st.button(label, key=unique_key):
                 st.session_state['selected_order'] = row['Order']
-                st.session_state['page'] = 'Order Details'
-                st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
-                reset_page_state('Order Details')
-                st.rer
+                st.session_state['go_to_details'] = True  # ✅ Safe flag
+        
+    else:
+        st.warning("No pending orders found. Ensure 'Status' is exactly 'Pending' (case-insensitive).")
+    
+    # ✅ SAFE NAVIGATION - Outside all loops/callbacks
+    if st.session_state.get('go_to_details', False):
+        st.session_state['page'] = 'Order Details'
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state('Order Details')
+        del st.session_state['go_to_details']
+        st.rerun()
+    
+    # Original page check
+    if st.session_state.get('page') != 'Pending Orders':
+        st.query_params.update({"logged_in": "true", "page": st.session_state['page']})
+        reset_page_state(st.session_state['page'])
+        st.rerun()
 
 # === ORDER DETAILS PAGE ===
 def order_details_page():
