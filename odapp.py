@@ -467,6 +467,7 @@ def pending_orders_page():
         st.rerun()
 
 # === ORDER DETAILS PAGE ===
+# === ORDER DETAILS PAGE ===
 def order_details_page():
     col1, col2 = st.columns([8, 1])
     with col1:
@@ -486,7 +487,69 @@ def order_details_page():
     headers = all_data[0]
     df = pd.DataFrame(all_data[1:], columns=headers)
     df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
-    row = df[df['Order'] == st.session_state['selected_order']].iloc[0]
+    
+    # Check if order exists to prevent errors
+    matching_orders = df[df['Order'] == st.session_state['selected_order']]
+    if matching_orders.empty:
+        st.error("Order not found.")
+        return
+        
+    row = matching_orders.iloc[0]
+
+    # Helper for consistent copyable boxes
+    def show_copyable(label: str, value: str):
+        st.markdown(f"**{label}**")
+        st.text_area(
+            "",
+            value=value,
+            height=90,
+            key=f"detail_{label.replace(' ', '_').lower()}",
+            label_visibility="collapsed",
+            help="Click the clipboard icon to copy"
+        )
+
+    show_copyable("Order Number", row['Order'])
+    show_copyable("Item • Color • Size", f"{row['Item']} (Color: {row['Color']}, Size: {row['Size']})")
+    show_copyable("Carousell ID", row.get('Carousell ID', ''))
+    show_copyable("Phone", row['Phone'])
+    show_copyable("Address", row['Address'])
+
+    sf_input = st.text_input("Enter SF Delivery Number", key="sf_input")
+
+    if st.button("Submit SF Number & Mark as Delivered", type="primary", use_container_width=True):
+        if not sf_input.strip():
+            st.error("Enter SF number.")
+            st.stop()
+
+        if update_sf_delivery(st.session_state['selected_order'], sf_input.strip()):
+            st.success("SF number saved → Status changed to **Delivered**")
+            get_pending_df.clear()
+            msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
+            st.markdown("**Message to customer**")
+            st.text_area(
+                "",
+                value=msg,
+                height=110,
+                key="sf_message_final",
+                label_visibility="collapsed",
+                help="Click the clipboard icon to copy"
+            )
+        else:
+            st.error("Update failed.")
+
+    # === NEW: CANCEL ORDER SECTION ===
+    st.divider()  # Adds a visual line separator
+    st.markdown("### Cancel Order")
+    
+    if st.button("❌ Cancel this Order", use_container_width=True):
+        # Uses your existing update_order_status function
+        if update_order_status(st.session_state['selected_order'], "Cancelled"):
+            st.success(f"Order {st.session_state['selected_order']} has been successfully cancelled.")
+            # Clearing the cache ensures it disappears from the Pending Orders page
+            get_pending_df.clear() 
+        else:
+            st.error("Failed to cancel the order. Please check the connection and try again.")
+
 
     # Helper for consistent copyable boxes
     def show_copyable(label: str, value: str):
