@@ -472,7 +472,9 @@ def order_details_page():
     with col1:
         st.title("Order Details")
     with col2:
-        st.button("Home", key="home_details", on_click=lambda: st.session_state.update({'page': 'Home'}))
+        # Change 1: Set a flag instead of using a callback
+        if st.button("Home", key="home_details"):
+            st.session_state['go_home'] = True
 
     if 'selected_order' not in st.session_state:
         st.error("No order selected.")
@@ -504,7 +506,7 @@ def order_details_page():
             "",
             value=value,
             height=90,
-            key=f"detail_{order_id}_{safe_label}",  # Unique key per order and label
+            key=f"detail_{order_id}_{safe_label}",  
             label_visibility="collapsed",
             help="Click the clipboard icon to copy"
         )
@@ -517,24 +519,18 @@ def order_details_page():
 
     sf_input = st.text_input("Enter SF Delivery Number", key=f"sf_input_{order_id}")
 
+    # === SUBMIT SF NUMBER SECTION ===
     if st.button("Submit SF Number & Mark as Delivered", type="primary", use_container_width=True, key=f"btn_sf_{order_id}"):
         if not sf_input.strip():
             st.error("Enter SF number.")
             st.stop()
 
         if update_sf_delivery(order_id, sf_input.strip()):
-            st.success("SF number saved → Status changed to **Delivered**")
+            # Clear cache so it disappears from the Pending list
             get_pending_df.clear()
-            msg = f"SF Delivery Number: {sf_input.strip()}\nHello shoes are sent. Please leave a 5-star review! Thank you!"
-            st.markdown("**Message to customer**")
-            st.text_area(
-                "",
-                value=msg,
-                height=110,
-                key=f"sf_message_final_{order_id}",  # Unique key for success message
-                label_visibility="collapsed",
-                help="Click the clipboard icon to copy"
-            )
+            
+            # Use flag for safe navigation
+            st.session_state['go_to_pending'] = True
         else:
             st.error("Update failed.")
 
@@ -547,13 +543,26 @@ def order_details_page():
             # Clear cache so it disappears from the Pending list
             get_pending_df.clear() 
             
-            # Navigate back to pending orders
-            st.session_state['page'] = 'Pending Orders'
-            st.query_params.update({"logged_in": "true", "page": "Pending Orders"})
-            st.rerun()
+            # Use flag for safe navigation
+            st.session_state['go_to_pending'] = True
         else:
             st.error("Failed to cancel the order. Please check the connection and try again.")
 
+    # === NAVIGATION ROUTER ===
+    # Change 2: Handle all page redirects safely at the end of the script
+    if st.session_state.get('go_home', False):
+        del st.session_state['go_home']
+        st.session_state['page'] = 'Home'
+        st.query_params.update({"logged_in": "true", "page": "Home"})
+        reset_page_state('Home')
+        st.rerun()
+        
+    if st.session_state.get('go_to_pending', False):
+        del st.session_state['go_to_pending']
+        st.session_state['page'] = 'Pending Orders'
+        st.query_params.update({"logged_in": "true", "page": "Pending Orders"})
+        reset_page_state('Pending Orders')
+        st.rerun()
 
 # === BOOK KEEPING PAGE ===
 def book_keeping_page():
